@@ -127,6 +127,13 @@ class Special_Rate_Shipping {
 			$this->admin = new Special_Rate_Shipping_Admin_API();
 		}
 
+		// Load USPS API integration
+		require_once( dirname( __FILE__ ) . '/class-usps-api.php' );
+		
+		// Add label generation handlers
+		add_action( 'admin_post_print_pouch_label', array( $this, 'handle_print_pouch_label' ) );
+		add_action( 'admin_post_generate_usps_label', array( $this, 'handle_generate_usps_label' ) );
+
 		// Handle localisation
 		$this->load_plugin_textdomain();
 		add_action( 'init', array( $this, 'load_localisation' ), 0 );
@@ -400,13 +407,36 @@ class Special_Rate_Shipping {
 		$barcode = get_post_meta( $post->ID, '_barcode', true );
 		
 		if ( $barcode ) :
+			$usps_label_url = get_post_meta( $post->ID, '_usps_label_url', true );
+			$tracking_number = get_post_meta( $post->ID, '_tracking_number', true );
 			?>
 			<div class="pouch-barcode-display">
 				<p><strong><?php esc_html_e( 'Barcode:', 'special-rate-shipping' ); ?></strong></p>
 				<div class="barcode-text"><?php echo esc_html( $barcode ); ?></div>
+				
+				<?php if ( $tracking_number ) : ?>
+					<p><strong><?php esc_html_e( 'Tracking:', 'special-rate-shipping' ); ?></strong></p>
+					<div class="tracking-text" style="font-family: 'Courier New', monospace; font-size: 14px; padding: 5px; background: #f9f9f9; border: 1px solid #ddd; margin: 5px 0;">
+						<?php echo esc_html( $tracking_number ); ?>
+					</div>
+				<?php endif; ?>
+				
 				<p>
-					<button type="button" class="button" onclick="window.open('<?php echo esc_url( admin_url( 'admin-post.php?action=print_pouch_label&pouch_id=' . $post->ID ) ); ?>', '_blank')">
-						<?php esc_html_e( 'Print Label', 'special-rate-shipping' ); ?>
+					<?php if ( $usps_label_url ) : ?>
+						<button type="button" class="button button-primary" onclick="window.open('<?php echo esc_url( $usps_label_url ); ?>', '_blank')">
+							<span class="dashicons dashicons-download" style="vertical-align: middle;"></span>
+							<?php esc_html_e( 'Download USPS Label', 'special-rate-shipping' ); ?>
+						</button>
+					<?php else : ?>
+						<button type="button" class="button button-secondary" onclick="generateUSPSLabel(<?php echo esc_js( $post->ID ); ?>)">
+							<span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
+							<?php esc_html_e( 'Generate USPS Label', 'special-rate-shipping' ); ?>
+						</button>
+					<?php endif; ?>
+					
+					<button type="button" class="button" onclick="window.open('<?php echo esc_url( admin_url( 'admin-post.php?action=print_pouch_label&pouch_id=' . $post->ID ) ); ?>', '_blank')" style="margin-left: 10px;">
+						<span class="dashicons dashicons-printer" style="vertical-align: middle;"></span>
+						<?php esc_html_e( 'Print Simple Label', 'special-rate-shipping' ); ?>
 					</button>
 				</p>
 			</div>
@@ -429,6 +459,41 @@ class Special_Rate_Shipping {
 				letter-spacing: 2px;
 			}
 			</style>
+			<script>
+			function generateUSPSLabel(pouchId) {
+				if (!confirm('<?php esc_html_e( 'Generate USPS shipping label for this pouch? This may incur charges.', 'special-rate-shipping' ); ?>')) {
+					return;
+				}
+				
+				const button = event.target;
+				const originalText = button.innerHTML;
+				button.innerHTML = '<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php esc_html_e( 'Generating...', 'special-rate-shipping' ); ?>';
+				button.disabled = true;
+				
+				fetch('<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+					},
+					body: 'action=generate_usps_label&pouch_id=' + pouchId + '&_wpnonce=<?php echo wp_create_nonce( 'generate_usps_label_' . $post->ID ); ?>'
+				})
+				.then(response => response.json())
+				.then(data => {
+					if (data.success) {
+						location.reload(); // Reload to show new label
+					} else {
+						alert('<?php esc_html_e( 'Error:', 'special-rate-shipping' ); ?> ' + (data.data || '<?php esc_html_e( 'Unknown error occurred', 'special-rate-shipping' ); ?>'));
+						button.innerHTML = originalText;
+						button.disabled = false;
+					}
+				})
+				.catch(error => {
+					alert('<?php esc_html_e( 'Network error:', 'special-rate-shipping' ); ?> ' + error.message);
+					button.innerHTML = originalText;
+					button.disabled = false;
+				});
+			}
+			</script>
 			<?php
 		else :
 			?>
@@ -1030,7 +1095,7 @@ class Special_Rate_Shipping {
 			'manage_woocommerce',
 			'special-rate-system',
 			array( $this, 'admin_dashboard_page' ),
-			'dashicons-shopping-cart',
+			'dashicons-products',
 			56
 		);
 
@@ -1711,5 +1776,275 @@ City, State ZIP"></textarea>
 		}
 		$this->maybe_create_pouch_from_order( $order_id );
 	} // End maybe_create_pouch_from_thankyou ()
+
+	/**
+	 * Handle USPS label generation request
+	 * @access  public
+	 * @since   2.0.0
+	 * @return  void
+	 */
+	public function handle_generate_usps_label() {
+		// Verify nonce and permissions
+		if ( ! isset( $_POST['_wpnonce'] ) || ! isset( $_POST['pouch_id'] ) ) {
+			wp_die( 'Invalid request', 'Error', array( 'response' => 400 ) );
+		}
+		
+		$pouch_id = intval( $_POST['pouch_id'] );
+		
+		if ( ! wp_verify_nonce( $_POST['_wpnonce'], 'generate_usps_label_' . $pouch_id ) ) {
+			wp_die( 'Security check failed', 'Error', array( 'response' => 403 ) );
+		}
+		
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( 'Insufficient permissions', 'Error', array( 'response' => 403 ) );
+		}
+		
+		// Get pouch data
+		$pouch = get_post( $pouch_id );
+		if ( ! $pouch || $pouch->post_type !== 'pouch' ) {
+			wp_send_json_error( 'Invalid pouch ID' );
+			return;
+		}
+		
+		// Generate USPS label
+		$result = $this->generate_usps_label_for_pouch( $pouch_id );
+		
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( $result->get_error_message() );
+		} else {
+			wp_send_json_success( $result );
+		}
+	} // End handle_generate_usps_label ()
+
+	/**
+	 * Generate USPS label for a pouch
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $pouch_id
+	 * @return  array|WP_Error
+	 */
+	public function generate_usps_label_for_pouch( $pouch_id ) {
+		// Get plugin settings
+		$api_key = get_option( 'srs_usps_api_key' );
+		$api_secret = get_option( 'srs_usps_api_secret' );
+		$environment = get_option( 'srs_usps_environment', 'sandbox' );
+		$debug = get_option( 'srs_debug_mode', false );
+		
+		if ( empty( $api_key ) || empty( $api_secret ) ) {
+			return new WP_Error( 'missing_credentials', 'USPS API credentials not configured. Please check plugin settings.' );
+		}
+		
+		// Initialize USPS API
+		$usps_api = new USPS_API( $api_key, $api_secret, $environment, $debug );
+		
+		// Get pouch data
+		$order_id = get_post_meta( $pouch_id, '_order_id', true );
+		$product_ids = get_post_meta( $pouch_id, '_pouch_products', true );
+		$package_type = get_post_meta( $pouch_id, '_package_type', true );
+		$recipient_info = get_post_meta( $pouch_id, '_recipient_info', true );
+		
+		// Get sender information from settings
+		$sender_data = array(
+			'first_name' => get_option( 'srs_sender_first_name', '' ),
+			'last_name' => get_option( 'srs_sender_last_name', '' ),
+			'company' => get_option( 'srs_sender_company', '' ),
+			'address_1' => get_option( 'srs_sender_address_1', '' ),
+			'address_2' => get_option( 'srs_sender_address_2', '' ),
+			'city' => get_option( 'srs_sender_city', '' ),
+			'state' => get_option( 'srs_sender_state', '' ),
+			'postcode' => get_option( 'srs_sender_postcode', '' )
+		);
+		
+		// Validate sender data
+		if ( empty( $sender_data['address_1'] ) || empty( $sender_data['city'] ) || empty( $sender_data['state'] ) || empty( $sender_data['postcode'] ) ) {
+			return new WP_Error( 'missing_sender_info', 'Sender address information not complete. Please check plugin settings.' );
+		}
+		
+		// Parse recipient information
+		$recipient_data = $this->parse_recipient_info( $recipient_info );
+		
+		if ( is_wp_error( $recipient_data ) ) {
+			return $recipient_data;
+		}
+		
+		// Get package dimensions based on package type
+		$package_dimensions = $this->get_package_dimensions( $package_type );
+		
+		// Calculate package weight from products
+		$total_weight = $this->calculate_package_weight( $product_ids );
+		
+		// Prepare label data
+		$label_data = array(
+			'from_address' => $sender_data,
+			'to_address' => $recipient_data,
+			'package' => array_merge( $package_dimensions, array( 'weight' => $total_weight ) ),
+			'service_type' => 'GROUND_ADVANTAGE', // Default service
+			'label_format' => 'PDF',
+			'tracking' => true
+		);
+		
+		// Generate label via USPS API
+		$label_response = $usps_api->create_label( $label_data );
+		
+		if ( is_wp_error( $label_response ) ) {
+			return $label_response;
+		}
+		
+		// Store label information in pouch meta
+		if ( isset( $label_response['labelImage'] ) ) {
+			update_post_meta( $pouch_id, '_usps_label_url', $label_response['labelImage'] );
+		}
+		
+		if ( isset( $label_response['trackingNumber'] ) ) {
+			update_post_meta( $pouch_id, '_tracking_number', $label_response['trackingNumber'] );
+		}
+		
+		if ( isset( $label_response['postage'] ) ) {
+			update_post_meta( $pouch_id, '_postage_cost', $label_response['postage'] );
+		}
+		
+		update_post_meta( $pouch_id, '_label_generated_date', current_time( 'mysql' ) );
+		update_post_meta( $pouch_id, '_usps_label_response', $label_response );
+		
+		// Update pouch status
+		update_post_meta( $pouch_id, '_pouch_status', 'packed' );
+		
+		return array(
+			'success' => true,
+			'tracking_number' => isset( $label_response['trackingNumber'] ) ? $label_response['trackingNumber'] : '',
+			'label_url' => isset( $label_response['labelImage'] ) ? $label_response['labelImage'] : '',
+			'postage_cost' => isset( $label_response['postage'] ) ? $label_response['postage'] : ''
+		);
+	} // End generate_usps_label_for_pouch ()
+
+	/**
+	 * Parse recipient information string into address array
+	 * @access  private
+	 * @since   2.0.0
+	 * @param   string $recipient_info
+	 * @return  array|WP_Error
+	 */
+	private function parse_recipient_info( $recipient_info ) {
+		if ( empty( $recipient_info ) ) {
+			return new WP_Error( 'missing_recipient', 'No recipient information available' );
+		}
+		
+		// Try to parse the formatted address string
+		// This is a simplified parser - in production you might want more sophisticated parsing
+		$lines = explode( "\n", trim( $recipient_info ) );
+		
+		if ( count( $lines ) < 3 ) {
+			return new WP_Error( 'invalid_recipient', 'Recipient address format is invalid' );
+		}
+		
+		$name_line = trim( $lines[0] );
+		$address_line = trim( $lines[1] );
+		$city_state_zip = trim( $lines[count($lines) - 1] );
+		
+		// Parse name (assume first word is first name, rest is last name)
+		$name_parts = explode( ' ', $name_line, 2 );
+		$first_name = isset( $name_parts[0] ) ? $name_parts[0] : '';
+		$last_name = isset( $name_parts[1] ) ? $name_parts[1] : '';
+		
+		// Parse city, state, zip
+		if ( preg_match( '/^(.+),\s*([A-Z]{2})\s+([0-9]{5}(-[0-9]{4})?)$/', $city_state_zip, $matches ) ) {
+			$city = trim( $matches[1] );
+			$state = trim( $matches[2] );
+			$postcode = trim( $matches[3] );
+		} else {
+			return new WP_Error( 'invalid_address_format', 'Cannot parse city, state, zip from address' );
+		}
+		
+		return array(
+			'first_name' => $first_name,
+			'last_name' => $last_name,
+			'company' => '',
+			'address_1' => $address_line,
+			'address_2' => '',
+			'city' => $city,
+			'state' => $state,
+			'postcode' => $postcode
+		);
+	} // End parse_recipient_info ()
+
+	/**
+	 * Get package dimensions based on package type
+	 * @access  private
+	 * @since   2.0.0
+	 * @param   string $package_type
+	 * @return  array
+	 */
+	private function get_package_dimensions( $package_type ) {
+		$dimensions = array(
+			'small_box' => array( 'length' => 8, 'width' => 6, 'height' => 4 ),
+			'medium_box' => array( 'length' => 12, 'width' => 8, 'height' => 6 ),
+			'big_box' => array( 'length' => 16, 'width' => 12, 'height' => 8 ),
+			'envelope' => array( 'length' => 12, 'width' => 9, 'height' => 1 ),
+			'flat_rate' => array( 'length' => 12, 'width' => 8, 'height' => 6 )
+		);
+		
+		return isset( $dimensions[ $package_type ] ) ? $dimensions[ $package_type ] : $dimensions['medium_box'];
+	} // End get_package_dimensions ()
+
+	/**
+	 * Calculate total package weight from product IDs
+	 * @access  private
+	 * @since   2.0.0
+	 * @param   array $product_ids
+	 * @return  float
+	 */
+	private function calculate_package_weight( $product_ids ) {
+		$total_weight = 0;
+		
+		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) {
+			foreach ( $product_ids as $product_id ) {
+				$product = wc_get_product( $product_id );
+				if ( $product && $product->has_weight() ) {
+					$total_weight += floatval( $product->get_weight() );
+				}
+			}
+		}
+		
+		// Default minimum weight if no product weights
+		return $total_weight > 0 ? $total_weight : 1.0;
+	} // End calculate_package_weight ()
+
+	/**
+	 * Handle simple label printing (existing functionality)
+	 * @access  public
+	 * @since   2.0.0
+	 * @return  void
+	 */
+	public function handle_print_pouch_label() {
+		if ( ! isset( $_GET['pouch_id'] ) || ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( 'Invalid request', 'Error', array( 'response' => 400 ) );
+		}
+		
+		$pouch_id = intval( $_GET['pouch_id'] );
+		$pouch = get_post( $pouch_id );
+		
+		if ( ! $pouch || $pouch->post_type !== 'pouch' ) {
+			wp_die( 'Invalid pouch', 'Error', array( 'response' => 404 ) );
+		}
+		
+		// Simple label printing HTML output
+		$barcode = get_post_meta( $pouch_id, '_barcode', true );
+		$package_type = get_post_meta( $pouch_id, '_package_type', true );
+		$recipient_info = get_post_meta( $pouch_id, '_recipient_info', true );
+		
+		header( 'Content-Type: text/html' );
+		echo '<!DOCTYPE html><html><head><title>Pouch Label</title><style>body{font-family:Arial,sans-serif;padding:20px;}.label{border:2px solid #000;padding:15px;max-width:400px;}.barcode{font-family:monospace;font-size:18px;font-weight:bold;text-align:center;margin:10px 0;padding:10px;border:1px solid #333;}</style></head><body>';
+		echo '<div class="label">';
+		echo '<h2>Shipping Label</h2>';
+		echo '<p><strong>Pouch ID:</strong> ' . esc_html( $pouch_id ) . '</p>';
+		echo '<p><strong>Package Type:</strong> ' . esc_html( ucwords( str_replace( '_', ' ', $package_type ) ) ) . '</p>';
+		echo '<div class="barcode">' . esc_html( $barcode ) . '</div>';
+		echo '<p><strong>Ship To:</strong></p>';
+		echo '<div style="white-space: pre-line;">' . esc_html( $recipient_info ) . '</div>';
+		echo '</div>';
+		echo '<script>window.print();</script>';
+		echo '</body></html>';
+		exit;
+	} // End handle_print_pouch_label ()
 
 }

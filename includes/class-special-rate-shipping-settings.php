@@ -108,32 +108,40 @@ class Special_Rate_Shipping_Settings {
 	private function settings_fields () {
 
 		$settings['api'] = array(
-			'title'					=> __( 'API Configuration', 'special-rate-shipping' ),
-			'description'			=> __( 'Configure API settings for shipping rate calculations and label generation.', 'special-rate-shipping' ),
+			'title'					=> __( 'USPS API Configuration', 'special-rate-shipping' ),
+			'description'			=> __( 'Configure USPS API settings for shipping rate calculations and label generation. You need to register at <a href="https://developer.usps.com" target="_blank">USPS Developer Portal</a> to get your API credentials.', 'special-rate-shipping' ),
 			'fields'				=> array(
 				array(
-					'id' 			=> 'api_key',
-					'label'			=> __( 'API Key' , 'special-rate-shipping' ),
-					'description'	=> __( 'Enter your shipping carrier API key for rate calculations and label generation.', 'special-rate-shipping' ),
+					'id' 			=> 'usps_api_key',
+					'label'			=> __( 'USPS API Key (Client ID)' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your USPS API Client ID from the USPS Developer Portal.', 'special-rate-shipping' ),
 					'type'			=> 'text_secret',
 					'default'		=> '',
-					'placeholder'	=> __( 'Your API Key', 'special-rate-shipping' )
+					'placeholder'	=> __( 'Your USPS Client ID', 'special-rate-shipping' )
 				),
 				array(
-					'id' 			=> 'api_environment',
-					'label'			=> __( 'API Environment', 'special-rate-shipping' ),
-					'description'	=> __( 'Select the API environment to use for shipping calculations.', 'special-rate-shipping' ),
+					'id' 			=> 'usps_api_secret',
+					'label'			=> __( 'USPS API Secret (Client Secret)' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your USPS API Client Secret from the USPS Developer Portal.', 'special-rate-shipping' ),
+					'type'			=> 'text_secret',
+					'default'		=> '',
+					'placeholder'	=> __( 'Your USPS Client Secret', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'usps_environment',
+					'label'			=> __( 'USPS API Environment', 'special-rate-shipping' ),
+					'description'	=> __( 'Select the USPS API environment. Use Sandbox for testing, Production for live transactions.', 'special-rate-shipping' ),
 					'type'			=> 'select',
 					'options'		=> array( 
-						'sandbox' => __( 'Sandbox (Testing)', 'special-rate-shipping' ), 
-						'production' => __( 'Production (Live)', 'special-rate-shipping' ) 
+						'sandbox' => __( 'Sandbox (Testing - api-cat.usps.com)', 'special-rate-shipping' ), 
+						'production' => __( 'Production (Live - api.usps.com)', 'special-rate-shipping' ) 
 					),
 					'default'		=> 'sandbox'
 				),
 				array(
-					'id' 			=> 'enable_debug',
+					'id' 			=> 'debug_mode',
 					'label'			=> __( 'Enable Debug Mode', 'special-rate-shipping' ),
-					'description'	=> __( 'Enable debug mode to log API requests and responses for troubleshooting.', 'special-rate-shipping' ),
+					'description'	=> __( 'Enable debug mode to log USPS API requests and responses for troubleshooting.', 'special-rate-shipping' ),
 					'type'			=> 'checkbox',
 					'default'		=> ''
 				)
@@ -142,23 +150,71 @@ class Special_Rate_Shipping_Settings {
 
 		$settings['sender'] = array(
 			'title'					=> __( 'Sender Information', 'special-rate-shipping' ),
-			'description'			=> __( 'Configure your business information for shipping labels and rate calculations.', 'special-rate-shipping' ),
+			'description'			=> __( 'Configure your business information for shipping labels and rate calculations. This information will be used as the "From" address on USPS labels.', 'special-rate-shipping' ),
 			'fields'				=> array(
 				array(
-					'id' 			=> 'sender_name',
-					'label'			=> __( 'Company/Sender Name' , 'special-rate-shipping' ),
-					'description'	=> __( 'Enter your company or sender name for shipping labels.', 'special-rate-shipping' ),
+					'id' 			=> 'sender_first_name',
+					'label'			=> __( 'First Name' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter the sender\'s first name.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( 'John', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_last_name',
+					'label'			=> __( 'Last Name' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter the sender\'s last name.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( 'Doe', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_company',
+					'label'			=> __( 'Company Name' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your company name (optional).', 'special-rate-shipping' ),
 					'type'			=> 'text',
 					'default'		=> get_bloginfo( 'name' ),
 					'placeholder'	=> __( 'Your Company Name', 'special-rate-shipping' )
 				),
 				array(
-					'id' 			=> 'sender_email',
-					'label'			=> __( 'Contact Email' , 'special-rate-shipping' ),
-					'description'	=> __( 'Enter your business contact email address.', 'special-rate-shipping' ),
+					'id' 			=> 'sender_address_1',
+					'label'			=> __( 'Address Line 1' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your street address.', 'special-rate-shipping' ),
 					'type'			=> 'text',
-					'default'		=> get_option( 'admin_email' ),
-					'placeholder'	=> __( 'contact@yourcompany.com', 'special-rate-shipping' )
+					'default'		=> '',
+					'placeholder'	=> __( '123 Main Street', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_address_2',
+					'label'			=> __( 'Address Line 2' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter apartment, suite, unit, building, floor, etc. (optional).', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( 'Suite 100', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_city',
+					'label'			=> __( 'City' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your city.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( 'New York', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_state',
+					'label'			=> __( 'State' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your state (2-letter abbreviation).', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( 'NY', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_postcode',
+					'label'			=> __( 'ZIP Code' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your ZIP code.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( '10001', 'special-rate-shipping' )
 				),
 				array(
 					'id' 			=> 'sender_phone',
@@ -169,12 +225,12 @@ class Special_Rate_Shipping_Settings {
 					'placeholder'	=> __( '+1-555-123-4567', 'special-rate-shipping' )
 				),
 				array(
-					'id' 			=> 'sender_address',
-					'label'			=> __( 'Business Address' , 'special-rate-shipping' ),
-					'description'	=> __( 'Enter your complete business address for shipping calculations and labels.', 'special-rate-shipping' ),
-					'type'			=> 'textarea',
-					'default'		=> '',
-					'placeholder'	=> __( '123 Main Street\nCity, State 12345\nCountry', 'special-rate-shipping' )
+					'id' 			=> 'sender_email',
+					'label'			=> __( 'Contact Email' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your business contact email address.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> get_option( 'admin_email' ),
+					'placeholder'	=> __( 'contact@yourcompany.com', 'special-rate-shipping' )
 				)
 			)
 		);
