@@ -1,0 +1,45 @@
+{
+    "name": "kobkob/special-rate-shipping",
+    "description": "WooCommerce extension providing custom shipping rates based on product types and quantities",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Monsenhor Ricardo Filipo",
+            "email": "filipo@kobkob.org",
+            "homepage": "http://www.kobkob.org/"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "squizlabs/php_codesniffer": "^3.7",
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpstan/phpstan": "^1.10",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "KobKob\\SpecialRateShipping\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "KobKob\\SpecialRateShipping\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpcs": "phpcs --standard=WordPress src/ --extensions=php",
+        "phpcbf": "phpcbf --standard=WordPress src/ --extensions=php",
+        "phpstan": "phpstan analyse src/ --level=8"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}

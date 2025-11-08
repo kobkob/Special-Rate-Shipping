@@ -1,0 +1,252 @@
+/**
+ * Admin styles for Special Rate Shipping plugin
+ * 
+ * @package KobKob\SpecialRateShipping
+ * @since 2.0.0
+ */
+
+/* Variables */
+$primary-color: #0073aa;
+$secondary-color: #005177;
+$success-color: #46b450;
+$warning-color: #ffb900;
+$error-color: #dc3232;
+$border-color: #ccd0d4;
+$background-color: #f1f1f1;
+
+/* Admin settings page */
+.special-rate-shipping-settings {
+	max-width: 800px;
+	
+	.form-table {
+		th {
+			width: 200px;
+			padding: 15px 10px 15px 0;
+		}
+		
+		td {
+			padding: 15px 10px;
+			
+			input[type="text"],
+			input[type="number"],
+			input[type="email"],
+			select {
+				width: 300px;
+			}
+			
+			.description {
+				color: #666;
+				font-style: italic;
+				margin-top: 5px;
+			}
+		}
+	}
+	
+	.section-title {
+		border-bottom: 2px solid $primary-color;
+		padding-bottom: 10px;
+		margin: 30px 0 20px;
+		color: $primary-color;
+		font-size: 18px;
+		font-weight: 600;
+	}
+	
+	.package-config {
+		background: #fff;
+		border: 1px solid $border-color;
+		border-radius: 4px;
+		padding: 20px;
+		margin: 15px 0;
+		
+		h4 {
+			margin-top: 0;
+			color: $secondary-color;
+			border-bottom: 1px solid $border-color;
+			padding-bottom: 10px;
+		}
+		
+		.package-settings {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+			gap: 15px;
+			margin-top: 15px;
+		}
+	}
+	
+	.shipping-class-config {
+		background: $background-color;
+		border: 1px solid $border-color;
+		border-radius: 4px;
+		padding: 15px;
+		margin: 10px 0;
+		
+		.class-name {
+			font-weight: 600;
+			color: $secondary-color;
+			margin-bottom: 10px;
+		}
+		
+		.class-options {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: 10px;
+		}
+	}
+}
+
+/* Debug information */
+.special-rate-shipping-debug {
+	background: #fff;
+	border: 1px solid $border-color;
+	padding: 15px;
+	margin: 10px 0;
+	font-family: monospace;
+	font-size: 12px;
+	
+	h4 {
+		margin-top: 0;
+		color: $primary-color;
+	}
+	
+	pre {
+		background: $background-color;
+		padding: 10px;
+		border-radius: 3px;
+		overflow-x: auto;
+		white-space: pre-wrap;
+	}
+}
+
+/* Button styles */
+.special-rate-shipping-btn {
+	background: $primary-color;
+	color: white;
+	border: none;
+	padding: 8px 16px;
+	border-radius: 3px;
+	cursor: pointer;
+	text-decoration: none;
+	display: inline-block;
+	transition: background-color 0.3s ease;
+	
+	&:hover {
+		background: $secondary-color;
+		color: white;
+	}
+	
+	&.secondary {
+		background: $border-color;
+		color: #333;
+		
+		&:hover {
+			background: darken($border-color, 10%);
+		}
+	}
+	
+	&.success {
+		background: $success-color;
+		
+		&:hover {
+			background: darken($success-color, 10%);
+		}
+	}
+	
+	&.warning {
+		background: $warning-color;
+		
+		&:hover {
+			background: darken($warning-color, 10%);
+		}
+	}
+	
+	&.error {
+		background: $error-color;
+		
+		&:hover {
+			background: darken($error-color, 10%);
+		}
+	}
+}
+
+/* Notices */
+.special-rate-shipping-notice {
+	padding: 10px 15px;
+	margin: 10px 0;
+	border-left: 4px solid;
+	border-radius: 0 3px 3px 0;
+	
+	&.info {
+		background: #e1f5fe;
+		border-color: #0288d1;
+		color: #01579b;
+	}
+	
+	&.success {
+		background: #e8f5e8;
+		border-color: $success-color;
+		color: darken($success-color, 20%);
+	}
+	
+	&.warning {
+		background: #fff3cd;
+		border-color: $warning-color;
+		color: darken($warning-color, 30%);
+	}
+	
+	&.error {
+		background: #f8d7da;
+		border-color: $error-color;
+		color: darken($error-color, 10%);
+	}
+}
+
+/* Loading spinner */
+.special-rate-shipping-loading {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	border: 3px solid rgba($primary-color, 0.3);
+	border-radius: 50%;
+	border-top-color: $primary-color;
+	animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+	.special-rate-shipping-settings {
+		.form-table {
+			th,
+			td {
+				display: block;
+				width: 100%;
+				padding: 10px 0;
+			}
+			
+			th {
+				font-weight: 600;
+				border-bottom: 1px solid $border-color;
+				margin-bottom: 5px;
+			}
+			
+			td {
+				input[type="text"],
+				input[type="number"],
+				input[type="email"],
+				select {
+					width: 100%;
+				}
+			}
+		}
+		
+		.package-settings,
+		.class-options {
+			grid-template-columns: 1fr;
+		}
+	}
+}

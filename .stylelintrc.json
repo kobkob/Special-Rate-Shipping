@@ -1,0 +1,21 @@
+{
+	"extends": [
+		"stylelint-config-wordpress"
+	],
+	"rules": {
+		"indentation": "tab",
+		"string-quotes": "double",
+		"color-hex-case": "lower",
+		"color-hex-length": "short",
+		"max-empty-lines": 2,
+		"no-missing-end-of-source-newline": true,
+		"property-no-vendor-prefix": null,
+		"value-no-vendor-prefix": null,
+		"selector-no-vendor-prefix": null
+	},
+	"ignoreFiles": [
+		"assets/dist/**/*",
+		"node_modules/**/*",
+		"vendor/**/*"
+	]
+}

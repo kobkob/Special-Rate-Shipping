@@ -1,0 +1,61 @@
+{
+	"name": "special-rate-shipping",
+	"title": "Special Rate Shipping",
+	"description": "WooCommerce extension providing custom shipping rates based on product types and quantities",
+	"version": "2.0.0",
+	"license": "GPL-2.0-or-later",
+	"author": "Monsenhor Ricardo Filipo",
+	"homepage": "http://www.kobkob.org/",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/kobkob/special-rate-shipping"
+	},
+	"keywords": [
+		"wordpress",
+		"plugin",
+		"woocommerce",
+		"shipping",
+		"ecommerce"
+	],
+	"engines": {
+		"node": ">=16.0.0",
+		"npm": ">=8.0.0"
+	},
+	"scripts": {
+		"dev": "webpack --mode=development --watch",
+		"build": "webpack --mode=production",
+		"build:dev": "webpack --mode=development",
+		"lint:js": "eslint assets/src/js/**/*.js",
+		"lint:css": "stylelint assets/src/scss/**/*.scss",
+		"lint": "npm run lint:js && npm run lint:css",
+		"format": "prettier --write assets/src/**/*.{js,scss}",
+		"test": "jest",
+		"test:watch": "jest --watch",
+		"clean": "rimraf assets/dist"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.23.0",
+		"@babel/preset-env": "^7.23.0",
+		"@wordpress/eslint-plugin": "^17.0.0",
+		"@wordpress/prettier-config": "^3.0.0",
+		"babel-loader": "^9.1.0",
+		"css-loader": "^6.8.0",
+		"eslint": "^8.52.0",
+		"jest": "^29.7.0",
+		"mini-css-extract-plugin": "^2.7.0",
+		"prettier": "^3.0.0",
+		"rimraf": "^5.0.0",
+		"sass": "^1.69.0",
+		"sass-loader": "^13.3.0",
+		"stylelint": "^15.11.0",
+		"stylelint-config-wordpress": "^17.0.0",
+		"webpack": "^5.89.0",
+		"webpack-cli": "^5.1.0"
+	},
+	"browserslist": [
+		"> 1%",
+		"last 2 versions",
+		"not dead"
+	],
+	"prettier": "@wordpress/prettier-config"
+}
