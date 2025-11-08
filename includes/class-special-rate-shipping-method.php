@@ -188,9 +188,6 @@ function special_rate_shipping_method_init() {
 				 * Add settings to the packages section
 				 */
 				function special_rate_pkg_settings( $settings, $current_section ) {
-					//echo "<h1>banana</h1>";
-					//var_dump($settings);
-					//die();
 					/**
 					 * Check the current section is what we want
 					 **/
