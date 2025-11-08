@@ -1,4 +1,13 @@
 <?php
+/**
+ * Special Rate Shipping Settings
+ *
+ * Handles the plugin settings and configuration interface.
+ *
+ * @package KobKob\SpecialRateShipping
+ * @author Monsenhor Ricardo Filipo <filipo@kobkob.org>
+ * @since 2.0.0
+ */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -8,7 +17,7 @@ class Special_Rate_Shipping_Settings {
 	 * The single instance of Special_Rate_Shipping_Settings.
 	 * @var 	object
 	 * @access  private
-	 * @since 	1.0.0
+	 * @since 	2.0.0
 	 */
 	private static $_instance = null;
 
@@ -16,7 +25,7 @@ class Special_Rate_Shipping_Settings {
 	 * The main plugin object.
 	 * @var 	object
 	 * @access  public
-	 * @since 	1.0.0
+	 * @since 	2.0.0
 	 */
 	public $parent = null;
 
@@ -24,7 +33,7 @@ class Special_Rate_Shipping_Settings {
 	 * Prefix for plugin settings.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $base = '';
 
@@ -32,14 +41,14 @@ class Special_Rate_Shipping_Settings {
 	 * Available settings for plugin.
 	 * @var     array
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $settings = array();
 
 	public function __construct ( $parent ) {
 		$this->parent = $parent;
 
-		$this->base = 'wpt_';
+		$this->base = 'srs_';
 
 		// Initialise settings
 		add_action( 'init', array( $this, 'init_settings' ), 11 );
@@ -67,7 +76,7 @@ class Special_Rate_Shipping_Settings {
 	 * @return void
 	 */
 	public function add_menu_item () {
-		$page = add_options_page( __( 'Plugin Settings', 'special-rate-shipping' ) , __( 'Plugin Settings', 'special-rate-shipping' ) , 'manage_options' , $this->parent->_token . '_settings' ,  array( $this, 'settings_page' ) );
+		$page = add_options_page( __( 'Special Rate Shipping', 'special-rate-shipping' ) , __( 'Special Rate Shipping', 'special-rate-shipping' ) , 'manage_options' , $this->parent->_token . '_settings' ,  array( $this, 'settings_page' ) );
 		add_action( 'admin_print_styles-' . $page, array( $this, 'settings_assets' ) );
 	}
 
@@ -76,17 +85,8 @@ class Special_Rate_Shipping_Settings {
 	 * @return void
 	 */
 	public function settings_assets () {
-
-		// We're including the farbtastic script & styles here because they're needed for the colour picker
-		// If you're not including a colour picker field then you can leave these calls out as well as the farbtastic dependency for the wpt-admin-js script below
-		wp_enqueue_style( 'farbtastic' );
-    	wp_enqueue_script( 'farbtastic' );
-
-    	// We're including the WP media scripts here because they're needed for the image upload field
-    	// If you're not including an image upload then you can leave this function call out
-    	wp_enqueue_media();
-
-    	wp_register_script( $this->parent->_token . '-settings-js', $this->parent->assets_url . 'js/settings' . $this->parent->script_suffix . '.js', array( 'farbtastic', 'jquery' ), '1.0.0' );
+		// Load settings JavaScript for enhanced functionality
+    	wp_register_script( $this->parent->_token . '-settings-js', $this->parent->assets_url . 'js/settings' . $this->parent->script_suffix . '.js', array( 'jquery' ), '2.0.0' );
     	wp_enqueue_script( $this->parent->_token . '-settings-js' );
 	}
 
@@ -107,110 +107,120 @@ class Special_Rate_Shipping_Settings {
 	 */
 	private function settings_fields () {
 
-		$settings['standard'] = array(
-			'title'					=> __( 'Standard', 'special-rate-shipping' ),
-			'description'			=> __( 'These are fairly standard form input fields.', 'special-rate-shipping' ),
+		$settings['api'] = array(
+			'title'					=> __( 'API Configuration', 'special-rate-shipping' ),
+			'description'			=> __( 'Configure API settings for shipping rate calculations and label generation.', 'special-rate-shipping' ),
 			'fields'				=> array(
 				array(
-					'id' 			=> 'text_field',
-					'label'			=> __( 'Some Text' , 'special-rate-shipping' ),
-					'description'	=> __( 'This is a standard text field.', 'special-rate-shipping' ),
-					'type'			=> 'text',
-					'default'		=> '',
-					'placeholder'	=> __( 'Placeholder text', 'special-rate-shipping' )
-				),
-				array(
-					'id' 			=> 'password_field',
-					'label'			=> __( 'A Password' , 'special-rate-shipping' ),
-					'description'	=> __( 'This is a standard password field.', 'special-rate-shipping' ),
-					'type'			=> 'password',
-					'default'		=> '',
-					'placeholder'	=> __( 'Placeholder text', 'special-rate-shipping' )
-				),
-				array(
-					'id' 			=> 'secret_text_field',
-					'label'			=> __( 'Some Secret Text' , 'special-rate-shipping' ),
-					'description'	=> __( 'This is a secret text field - any data saved here will not be displayed after the page has reloaded, but it will be saved.', 'special-rate-shipping' ),
+					'id' 			=> 'api_key',
+					'label'			=> __( 'API Key' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your shipping carrier API key for rate calculations and label generation.', 'special-rate-shipping' ),
 					'type'			=> 'text_secret',
 					'default'		=> '',
-					'placeholder'	=> __( 'Placeholder text', 'special-rate-shipping' )
+					'placeholder'	=> __( 'Your API Key', 'special-rate-shipping' )
 				),
 				array(
-					'id' 			=> 'text_block',
-					'label'			=> __( 'A Text Block' , 'special-rate-shipping' ),
-					'description'	=> __( 'This is a standard text area.', 'special-rate-shipping' ),
-					'type'			=> 'textarea',
-					'default'		=> '',
-					'placeholder'	=> __( 'Placeholder text for this textarea', 'special-rate-shipping' )
+					'id' 			=> 'api_environment',
+					'label'			=> __( 'API Environment', 'special-rate-shipping' ),
+					'description'	=> __( 'Select the API environment to use for shipping calculations.', 'special-rate-shipping' ),
+					'type'			=> 'select',
+					'options'		=> array( 
+						'sandbox' => __( 'Sandbox (Testing)', 'special-rate-shipping' ), 
+						'production' => __( 'Production (Live)', 'special-rate-shipping' ) 
+					),
+					'default'		=> 'sandbox'
 				),
 				array(
-					'id' 			=> 'single_checkbox',
-					'label'			=> __( 'An Option', 'special-rate-shipping' ),
-					'description'	=> __( 'A standard checkbox - if you save this option as checked then it will store the option as \'on\', otherwise it will be an empty string.', 'special-rate-shipping' ),
+					'id' 			=> 'enable_debug',
+					'label'			=> __( 'Enable Debug Mode', 'special-rate-shipping' ),
+					'description'	=> __( 'Enable debug mode to log API requests and responses for troubleshooting.', 'special-rate-shipping' ),
 					'type'			=> 'checkbox',
 					'default'		=> ''
-				),
-				array(
-					'id' 			=> 'select_box',
-					'label'			=> __( 'A Select Box', 'special-rate-shipping' ),
-					'description'	=> __( 'A standard select box.', 'special-rate-shipping' ),
-					'type'			=> 'select',
-					'options'		=> array( 'drupal' => 'Drupal', 'joomla' => 'Joomla', 'wordpress' => 'WordPress' ),
-					'default'		=> 'wordpress'
-				),
-				array(
-					'id' 			=> 'radio_buttons',
-					'label'			=> __( 'Some Options', 'special-rate-shipping' ),
-					'description'	=> __( 'A standard set of radio buttons.', 'special-rate-shipping' ),
-					'type'			=> 'radio',
-					'options'		=> array( 'superman' => 'Superman', 'batman' => 'Batman', 'ironman' => 'Iron Man' ),
-					'default'		=> 'batman'
-				),
-				array(
-					'id' 			=> 'multiple_checkboxes',
-					'label'			=> __( 'Some Items', 'special-rate-shipping' ),
-					'description'	=> __( 'You can select multiple items and they will be stored as an array.', 'special-rate-shipping' ),
-					'type'			=> 'checkbox_multi',
-					'options'		=> array( 'square' => 'Square', 'circle' => 'Circle', 'rectangle' => 'Rectangle', 'triangle' => 'Triangle' ),
-					'default'		=> array( 'circle', 'triangle' )
 				)
 			)
 		);
 
-		$settings['extra'] = array(
-			'title'					=> __( 'Extra', 'special-rate-shipping' ),
-			'description'			=> __( 'These are some extra input fields that maybe aren\'t as common as the others.', 'special-rate-shipping' ),
+		$settings['sender'] = array(
+			'title'					=> __( 'Sender Information', 'special-rate-shipping' ),
+			'description'			=> __( 'Configure your business information for shipping labels and rate calculations.', 'special-rate-shipping' ),
 			'fields'				=> array(
 				array(
-					'id' 			=> 'number_field',
-					'label'			=> __( 'A Number' , 'special-rate-shipping' ),
-					'description'	=> __( 'This is a standard number field - if this field contains anything other than numbers then the form will not be submitted.', 'special-rate-shipping' ),
+					'id' 			=> 'sender_name',
+					'label'			=> __( 'Company/Sender Name' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your company or sender name for shipping labels.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> get_bloginfo( 'name' ),
+					'placeholder'	=> __( 'Your Company Name', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_email',
+					'label'			=> __( 'Contact Email' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your business contact email address.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> get_option( 'admin_email' ),
+					'placeholder'	=> __( 'contact@yourcompany.com', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_phone',
+					'label'			=> __( 'Phone Number' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your business phone number for shipping purposes.', 'special-rate-shipping' ),
+					'type'			=> 'text',
+					'default'		=> '',
+					'placeholder'	=> __( '+1-555-123-4567', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'sender_address',
+					'label'			=> __( 'Business Address' , 'special-rate-shipping' ),
+					'description'	=> __( 'Enter your complete business address for shipping calculations and labels.', 'special-rate-shipping' ),
+					'type'			=> 'textarea',
+					'default'		=> '',
+					'placeholder'	=> __( '123 Main Street\nCity, State 12345\nCountry', 'special-rate-shipping' )
+				)
+			)
+		);
+
+		$settings['packages'] = array(
+			'title'					=> __( 'Package Settings', 'special-rate-shipping' ),
+			'description'			=> __( 'Configure default package types and shipping rates for your products.', 'special-rate-shipping' ),
+			'fields'				=> array(
+				array(
+					'id' 			=> 'small_box_rate',
+					'label'			=> __( 'Small Box Rate' , 'special-rate-shipping' ),
+					'description'	=> __( 'Default shipping rate for small packages.', 'special-rate-shipping' ),
+					'type'			=> 'number',
+					'default'		=> '6.35',
+					'placeholder'	=> __( '6.35', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'medium_box_rate',
+					'label'			=> __( 'Medium Box Rate' , 'special-rate-shipping' ),
+					'description'	=> __( 'Default shipping rate for medium packages.', 'special-rate-shipping' ),
+					'type'			=> 'number',
+					'default'		=> '9.35',
+					'placeholder'	=> __( '9.35', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'big_box_rate',
+					'label'			=> __( 'Big Box Rate' , 'special-rate-shipping' ),
+					'description'	=> __( 'Default shipping rate for large packages.', 'special-rate-shipping' ),
+					'type'			=> 'number',
+					'default'		=> '13.35',
+					'placeholder'	=> __( '13.35', 'special-rate-shipping' )
+				),
+				array(
+					'id' 			=> 'free_shipping_threshold',
+					'label'			=> __( 'Free Shipping Threshold' , 'special-rate-shipping' ),
+					'description'	=> __( 'Order total required for free shipping (leave empty to disable).', 'special-rate-shipping' ),
 					'type'			=> 'number',
 					'default'		=> '',
-					'placeholder'	=> __( '42', 'special-rate-shipping' )
+					'placeholder'	=> __( '100.00', 'special-rate-shipping' )
 				),
 				array(
-					'id' 			=> 'colour_picker',
-					'label'			=> __( 'Pick a colour', 'special-rate-shipping' ),
-					'description'	=> __( 'This uses WordPress\' built-in colour picker - the option is stored as the colour\'s hex code.', 'special-rate-shipping' ),
-					'type'			=> 'color',
-					'default'		=> '#21759B'
-				),
-				array(
-					'id' 			=> 'an_image',
-					'label'			=> __( 'An Image' , 'special-rate-shipping' ),
-					'description'	=> __( 'This will upload an image to your media library and store the attachment ID in the option field. Once you have uploaded an imge the thumbnail will display above these buttons.', 'special-rate-shipping' ),
-					'type'			=> 'image',
-					'default'		=> '',
-					'placeholder'	=> ''
-				),
-				array(
-					'id' 			=> 'multi_select_box',
-					'label'			=> __( 'A Multi-Select Box', 'special-rate-shipping' ),
-					'description'	=> __( 'A standard multi-select box - the saved data is stored as an array.', 'special-rate-shipping' ),
-					'type'			=> 'select_multi',
-					'options'		=> array( 'linux' => 'Linux', 'mac' => 'Mac', 'windows' => 'Windows' ),
-					'default'		=> array( 'linux' )
+					'id' 			=> 'enable_package_optimization',
+					'label'			=> __( 'Enable Package Optimization', 'special-rate-shipping' ),
+					'description'	=> __( 'Automatically optimize packaging to find the most cost-effective shipping solution.', 'special-rate-shipping' ),
+					'type'			=> 'checkbox',
+					'default'		=> 'on'
 				)
 			)
 		);
@@ -278,7 +288,7 @@ class Special_Rate_Shipping_Settings {
 
 		// Build page HTML
 		$html = '<div class="wrap" id="' . $this->parent->_token . '_settings">' . "\n";
-			$html .= '<h2>' . __( 'Plugin Settings' , 'special-rate-shipping' ) . '</h2>' . "\n";
+			$html .= '<h2>' . __( 'Special Rate Shipping Settings' , 'special-rate-shipping' ) . '</h2>' . "\n";
 
 			$tab = '';
 			if ( isset( $_GET['tab'] ) && $_GET['tab'] ) {
@@ -343,7 +353,7 @@ class Special_Rate_Shipping_Settings {
 	 *
 	 * Ensures only one instance of Special_Rate_Shipping_Settings is loaded or can be loaded.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 * @static
 	 * @see Special_Rate_Shipping()
 	 * @return Main Special_Rate_Shipping_Settings instance
@@ -358,7 +368,7 @@ class Special_Rate_Shipping_Settings {
 	/**
 	 * Cloning is forbidden.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 */
 	public function __clone () {
 		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ), $this->parent->_version );
@@ -367,7 +377,7 @@ class Special_Rate_Shipping_Settings {
 	/**
 	 * Unserializing instances of this class is forbidden.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 */
 	public function __wakeup () {
 		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ), $this->parent->_version );
