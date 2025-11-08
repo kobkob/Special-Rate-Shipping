@@ -268,34 +268,79 @@ function special_rate_shipping_method_init() {
 								)
 
 							);
+					// Initialize product shipping classes array
+					$prod_sh_class = array();
+					
 					// load products shipping classes from settings
-					foreach (WC()->shipping->get_shipping_classes() as $sp){
-						$prod_sh_class[$sp->term_id] = (object) array(
-								'slug'=>$sp->slug,
-								'packages' => array (
-									(object) array(
-										'id' =>  'small',
-										'enable' => $this->settings[$sp->term_id.'_small'],
-										'name' => $packages['small']->name,
-										'rate' => $packages['small']->rate,
-										'max_per_pack' => $this->settings[$sp->term_id.'_max_per_pack_small'] -1 
-										),
-									(object) array(
-										'id' =>  'medium',
-										'enable' => $this->settings[$sp->term_id.'_medium'],
-										'name' => $packages['medium']->name,
-										'rate' => $packages['medium']->rate,
-										'max_per_pack' => $this->settings[$sp->term_id.'_max_per_pack_medium'] -1 
-										),
-									(object) array(
-										'id' =>  'big',
-										'enable' => $this->settings[$sp->term_id.'_big'],
-										'name' => $packages['big']->name,
-										'rate' => $packages['big']->rate,
-										'max_per_pack' => $this->settings[$sp->term_id.'_max_per_pack_big']-1
+					$shipping_classes = WC()->shipping->get_shipping_classes();
+					if ( ! empty( $shipping_classes ) ) {
+						foreach ( $shipping_classes as $sp ) {
+							// Get settings with defaults to prevent undefined index warnings
+							$small_enabled = isset( $this->settings[$sp->term_id.'_small'] ) ? $this->settings[$sp->term_id.'_small'] : 'no';
+							$medium_enabled = isset( $this->settings[$sp->term_id.'_medium'] ) ? $this->settings[$sp->term_id.'_medium'] : 'no';
+							$big_enabled = isset( $this->settings[$sp->term_id.'_big'] ) ? $this->settings[$sp->term_id.'_big'] : 'no';
+							
+							$small_max = isset( $this->settings[$sp->term_id.'_max_per_pack_small'] ) ? (int) $this->settings[$sp->term_id.'_max_per_pack_small'] : 3;
+							$medium_max = isset( $this->settings[$sp->term_id.'_max_per_pack_medium'] ) ? (int) $this->settings[$sp->term_id.'_max_per_pack_medium'] : 6;
+							$big_max = isset( $this->settings[$sp->term_id.'_max_per_pack_big'] ) ? (int) $this->settings[$sp->term_id.'_max_per_pack_big'] : 12;
+							
+							$prod_sh_class[$sp->term_id] = (object) array(
+									'slug' => $sp->slug,
+									'packages' => array (
+										(object) array(
+											'id' =>  'small',
+											'enable' => $small_enabled,
+											'name' => $packages['small']->name,
+											'rate' => $packages['small']->rate,
+											'max_per_pack' => max( 1, $small_max - 1 )
+											),
+										(object) array(
+											'id' =>  'medium',
+											'enable' => $medium_enabled,
+											'name' => $packages['medium']->name,
+											'rate' => $packages['medium']->rate,
+											'max_per_pack' => max( 1, $medium_max - 1 )
+											),
+										(object) array(
+											'id' =>  'big',
+											'enable' => $big_enabled,
+											'name' => $packages['big']->name,
+											'rate' => $packages['big']->rate,
+											'max_per_pack' => max( 1, $big_max - 1 )
+											)
 										)
-										)
-										);
+								);
+						}
+					}
+					
+					// Add default shipping class (id: 0) for products without shipping classes
+					if ( ! isset( $prod_sh_class[0] ) ) {
+						$prod_sh_class[0] = (object) array(
+							'slug' => 'default',
+							'packages' => array (
+								(object) array(
+									'id' =>  'small',
+									'enable' => 'yes',
+									'name' => $packages['small']->name,
+									'rate' => $packages['small']->rate,
+									'max_per_pack' => 2
+									),
+								(object) array(
+									'id' =>  'medium',
+									'enable' => 'yes',
+									'name' => $packages['medium']->name,
+									'rate' => $packages['medium']->rate,
+									'max_per_pack' => 5
+									),
+								(object) array(
+									'id' =>  'big',
+									'enable' => 'yes',
+									'name' => $packages['big']->name,
+									'rate' => $packages['big']->rate,
+									'max_per_pack' => 11
+									)
+								)
+						);
 					}
 					foreach ( $items as $id => $cid ){
 						$item = (object) WC()->cart->get_cart_item($cid);
@@ -305,6 +350,17 @@ function special_rate_shipping_method_init() {
 						$_prod = $_pf->get_product($item->product_id);
 						//$class_id = $item->data->shipping_class_id;
 						$class_id = $_prod->get_shipping_class_id();
+						
+						// If no shipping class assigned or class doesn't exist in our array, use default (0)
+						if ( empty( $class_id ) || ! isset( $prod_sh_class[$class_id] ) ) {
+							$class_id = 0;
+						}
+						
+						// Skip if no shipping class configuration exists
+						if ( ! isset( $prod_sh_class[$class_id] ) || ! isset( $prod_sh_class[$class_id]->packages ) ) {
+							continue;
+						}
+						
 						//var_dump($prod_sh_class[$class_id]);
 						$qty = $item->quantity;
 						$price = 0;
@@ -314,30 +370,40 @@ function special_rate_shipping_method_init() {
 						while ($tobag > 0){
 							//echo "<h2>To bag: ".$tobag." items of product #".$item->product_id."</h2>";
 							//var_dump($item);
-							// select the shippest package for $tobag
-							foreach ($prod_sh_class[$class_id]->packages as $pkid=>$pk){
-								$rest = 0;
-								if($pk->enable == "yes"){
-									$si = $pk->max_per_pack + 1;
-									if ($tobag > $si){
-										$rest = $tobag % $si;
-									}
-									//echo "<p>That package accepts up tp ".$si." items. We have ".$tobag." items to bag.</p>";
-									//var_dump($pk);
-									$units = (int) floor($tobag/$si);
-									if ($units == 0 && $tobag < $si){
-										$units = 1; 
-									}
-									if ($price == 0 || $price >  $pk->rate * $units){
-										$price = $pk->rate * $units;
-										$bagid = $pkid;
-										//echo "<p>If we put in ".$units." ".$pk->name." pks, will rest ".$rest." and will price: $".$price."</p>"; 
+							// select the cheapest package for $tobag
+							if ( isset( $prod_sh_class[$class_id]->packages ) && is_array( $prod_sh_class[$class_id]->packages ) ) {
+								foreach ($prod_sh_class[$class_id]->packages as $pkid=>$pk){
+									$rest = 0;
+									if($pk->enable == "yes"){
+										$si = $pk->max_per_pack + 1;
+										if ($tobag > $si){
+											$rest = $tobag % $si;
+										}
+										//echo "<p>That package accepts up tp ".$si." items. We have ".$tobag." items to bag.</p>";
+										//var_dump($pk);
+										$units = (int) floor($tobag/$si);
+										if ($units == 0 && $tobag < $si){
+											$units = 1; 
+										}
+										if ($price == 0 || $price >  $pk->rate * $units){
+											$price = $pk->rate * $units;
+											$bagid = $pkid;
+											//echo "<p>If we put in ".$units." ".$pk->name." pks, will rest ".$rest." and will price: $".$price."</p>"; 
+										}
 									}
 								}
+							} else {
+								// If no packages available, break the loop
+								break;
 							}
 							// Choose package
 							//echo "<h2>Package choosed: ".$bagid."</h2>";
-							$pkg = $prod_sh_class[$class_id]->packages[$bagid];
+							if ( isset( $prod_sh_class[$class_id]->packages[$bagid] ) ) {
+								$pkg = $prod_sh_class[$class_id]->packages[$bagid];
+							} else {
+								// If no valid package found, break the loop
+								break;
+							}
 							//var_dump($pkg);
 							// Packing items
 							//echo "<p>Packing ".$tobag." items</p>";
