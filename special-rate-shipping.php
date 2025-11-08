@@ -5,7 +5,7 @@
  * Description: WooCommerce extension providing custom shipping rates based on product types and quantities with intelligent packaging optimization.
  * Version: 2.0.0
  * Requires at least: 5.0
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  * Tested up to: 6.4
  * WC requires at least: 6.0
  * WC tested up to: 8.5
@@ -35,13 +35,13 @@ define( 'SPECIAL_RATE_SHIPPING_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SPECIAL_RATE_SHIPPING_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
 // Check PHP version
-if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
+if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 	add_action( 'admin_notices', function () {
 		echo '<div class="error"><p>' . 
 			sprintf(
 				/* translators: %1$s: Required PHP version, %2$s: Current PHP version */
 				esc_html__( 'Special Rate Shipping requires PHP version %1$s or higher. You are running version %2$s.', 'special-rate-shipping' ),
-				'7.4',
+				'8.1',
 				PHP_VERSION
 			) . 
 			'</p></div>';

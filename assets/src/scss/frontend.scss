@@ -1,0 +1,59 @@
+/**
+ * Special Rate Shipping - Frontend Styles
+ *
+ * @package KobKob\SpecialRateShipping
+ * @author Monsenhor Ricardo Filipo <filipo@kobkob.org>
+ * @since 2.0.0
+ */
+
+// Frontend styles for Special Rate Shipping
+.special-rate-shipping {
+	&__calculator {
+		margin: 1rem 0;
+		
+		.shipping-estimate {
+			background: #f8f9fa;
+			border: 1px solid #dee2e6;
+			border-radius: 0.25rem;
+			padding: 1rem;
+			margin-top: 1rem;
+			
+			&__title {
+				font-weight: 600;
+				margin-bottom: 0.5rem;
+			}
+			
+			&__details {
+				font-size: 0.875rem;
+				color: #6c757d;
+				
+				ul {
+					margin: 0.5rem 0;
+					padding-left: 1.5rem;
+				}
+			}
+		}
+	}
+	
+	&__debug {
+		background: #fff3cd;
+		border: 1px solid #ffeaa7;
+		border-radius: 0.25rem;
+		padding: 1rem;
+		margin-top: 1rem;
+		font-size: 0.875rem;
+		
+		&__title {
+			font-weight: 600;
+			margin-bottom: 0.5rem;
+		}
+		
+		pre {
+			background: #f8f9fa;
+			padding: 0.5rem;
+			border-radius: 0.25rem;
+			overflow-x: auto;
+			font-size: 0.8rem;
+		}
+	}
+}
