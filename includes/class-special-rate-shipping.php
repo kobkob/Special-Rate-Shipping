@@ -137,6 +137,14 @@ class Special_Rate_Shipping {
 		// Add save hook for pouch meta data
 		add_action( 'save_post', array( $this, 'save_pouch_meta_data' ) );
 
+		// Hook into WooCommerce order processing
+		add_action( 'woocommerce_checkout_order_processed', array( $this, 'maybe_create_pouch_from_order' ), 10, 3 );
+		add_action( 'woocommerce_order_status_changed', array( $this, 'handle_order_status_change' ), 10, 4 );
+
+		// Add custom columns to pouch list
+		add_filter( 'manage_pouch_posts_columns', array( $this, 'add_pouch_columns' ) );
+		add_action( 'manage_pouch_posts_custom_column', array( $this, 'populate_pouch_columns' ), 10, 2 );
+
 		// Add admin menu
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 
@@ -184,6 +192,15 @@ class Special_Rate_Shipping {
 			'pouch',
 			'side',
 			'default'
+		);
+
+		add_meta_box(
+			'pouch-order',
+			__( 'Order Information', 'special-rate-shipping' ),
+			array( $this, 'pouch_order_meta_box' ),
+			'pouch',
+			'side',
+			'high'
 		);
 	} // End add_pouch_meta_boxes ()
 
@@ -384,6 +401,90 @@ class Special_Rate_Shipping {
 	} // End pouch_barcode_meta_box ()
 
 	/**
+	 * Order information meta box content
+	 * @access  public
+	 * @since   2.0.0
+	 * @return  void
+	 */
+	public function pouch_order_meta_box( $post ) {
+		$order_id = get_post_meta( $post->ID, '_order_id', true );
+		$customer_id = get_post_meta( $post->ID, '_customer_id', true );
+		$order_total = get_post_meta( $post->ID, '_order_total', true );
+
+		if ( $order_id ) :
+			$order = wc_get_order( $order_id );
+			if ( $order ) :
+				?>
+				<div class="pouch-order-info">
+					<p><strong><?php esc_html_e( 'Order:', 'special-rate-shipping' ); ?></strong><br>
+						<a href="<?php echo esc_url( $order->get_edit_order_url() ); ?>" target="_blank">
+							#<?php echo esc_html( $order->get_order_number() ); ?>
+						</a>
+					</p>
+
+					<p><strong><?php esc_html_e( 'Status:', 'special-rate-shipping' ); ?></strong><br>
+						<span class="order-status status-<?php echo esc_attr( $order->get_status() ); ?>">
+							<?php echo esc_html( wc_get_order_status_name( $order->get_status() ) ); ?>
+						</span>
+					</p>
+
+					<p><strong><?php esc_html_e( 'Total:', 'special-rate-shipping' ); ?></strong><br>
+						<?php echo wp_kses_post( wc_price( $order->get_total() ) ); ?>
+					</p>
+
+					<p><strong><?php esc_html_e( 'Date:', 'special-rate-shipping' ); ?></strong><br>
+						<?php echo esc_html( $order->get_date_created()->date_i18n( wc_date_format() ) ); ?>
+					</p>
+
+					<?php 
+					$customer = $order->get_user();
+					if ( $customer ) :
+					?>
+					<p><strong><?php esc_html_e( 'Customer:', 'special-rate-shipping' ); ?></strong><br>
+						<a href="<?php echo esc_url( admin_url( 'user-edit.php?user_id=' . $customer->ID ) ); ?>" target="_blank">
+							<?php echo esc_html( $customer->display_name ); ?>
+						</a>
+					</p>
+					<?php endif; ?>
+
+					<p>
+						<a href="<?php echo esc_url( $order->get_edit_order_url() ); ?>" class="button" target="_blank">
+							<?php esc_html_e( 'View Order', 'special-rate-shipping' ); ?>
+						</a>
+					</p>
+				</div>
+				<style>
+				.pouch-order-info {
+					padding: 10px;
+				}
+				.order-status {
+					padding: 4px 8px;
+					border-radius: 3px;
+					font-size: 11px;
+					font-weight: bold;
+					text-transform: uppercase;
+					background: #f0f0f0;
+					color: #444;
+				}
+				.status-processing { background: #c6e1c6; color: #5b841b; }
+				.status-completed { background: #c8d7e1; color: #2e4453; }
+				.status-on-hold { background: #f8dda7; color: #94660c; }
+				.status-cancelled { background: #eba3a3; color: #761919; }
+				</style>
+				<?php
+			else :
+				?>
+				<p><?php printf( esc_html__( 'Order #%s not found or deleted', 'special-rate-shipping' ), $order_id ); ?></p>
+				<?php
+			endif;
+		else :
+			?>
+			<p><?php esc_html_e( 'This pouch was created manually and is not linked to an order.', 'special-rate-shipping' ); ?></p>
+			<?php
+		endif;
+	} // End pouch_order_meta_box ()
+
+	/**
 	 * Save pouch meta box data
 	 * @access  public
 	 * @since   2.0.0
@@ -427,6 +528,368 @@ class Special_Rate_Shipping {
 			update_post_meta( $post_id, '_barcode', $this->generate_barcode() );
 		}
 	} // End save_pouch_meta_data ()
+
+	/**
+	 * Check if order uses Special Rate Shipping and create pouch if needed
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @param   array $posted_data
+	 * @param   WC_Order $order
+	 * @return  void
+	 */
+	public function maybe_create_pouch_from_order( $order_id, $posted_data, $order ) {
+		// Get the order
+		if ( ! $order ) {
+			$order = wc_get_order( $order_id );
+		}
+
+		if ( ! $order ) {
+			return;
+		}
+
+		// Check if order uses Special Rate Shipping
+		$shipping_methods = $order->get_shipping_methods();
+		$uses_special_rate = false;
+		$selected_package_type = 'medium_box'; // default
+
+		foreach ( $shipping_methods as $shipping_method ) {
+			if ( strpos( $shipping_method->get_method_id(), 'special_rate_shipping' ) !== false ) {
+				$uses_special_rate = true;
+				// Try to determine the best package type based on items
+				$selected_package_type = $this->determine_optimal_package_type( $order );
+				break;
+			}
+		}
+
+		if ( ! $uses_special_rate ) {
+			return;
+		}
+
+		// Check if pouch already exists for this order
+		$existing_pouch = get_posts( array(
+			'post_type' => 'pouch',
+			'meta_query' => array(
+				array(
+					'key' => '_order_id',
+					'value' => $order_id,
+					'compare' => '='
+				)
+			),
+			'posts_per_page' => 1,
+			'post_status' => 'any'
+		) );
+
+		if ( ! empty( $existing_pouch ) ) {
+			return; // Pouch already exists
+		}
+
+		// Get order items (products)
+		$product_ids = array();
+		foreach ( $order->get_items() as $item ) {
+			$product_ids[] = $item->get_product_id();
+		}
+
+		// Get shipping address
+		$shipping_address = $this->format_shipping_address( $order );
+
+		// Create the pouch
+		$pouch_title = sprintf(
+			__( 'Order #%s Pouch', 'special-rate-shipping' ),
+			$order->get_order_number()
+		);
+
+		$pouch_data = array(
+			'post_title' => $pouch_title,
+			'post_content' => '',
+			'post_status' => 'draft',
+			'post_type' => 'pouch',
+			'meta_input' => array(
+				'_pouch_products' => $product_ids,
+				'_package_type' => $selected_package_type,
+				'_recipient_info' => $shipping_address,
+				'_pouch_notes' => sprintf( __( 'Auto-generated from WooCommerce Order #%s', 'special-rate-shipping' ), $order->get_order_number() ),
+				'_pouch_status' => 'new',
+				'_created_date' => current_time( 'mysql' ),
+				'_barcode' => $this->generate_barcode(),
+				'_order_id' => $order_id,
+				'_order_total' => $order->get_total(),
+				'_customer_id' => $order->get_customer_id()
+			)
+		);
+
+		$pouch_id = wp_insert_post( $pouch_data );
+
+		if ( $pouch_id && ! is_wp_error( $pouch_id ) ) {
+			// Add order note
+			$order->add_order_note(
+				sprintf(
+					__( 'Shipping pouch created: %s (ID: %d)', 'special-rate-shipping' ),
+					$pouch_title,
+					$pouch_id
+				)
+			);
+
+			// Store pouch ID in order meta
+			$order->update_meta_data( '_pouch_id', $pouch_id );
+			$order->save();
+
+			// Log successful creation
+			error_log( sprintf( 'Special Rate Shipping: Created pouch %d for order %d', $pouch_id, $order_id ) );
+		}
+	} // End maybe_create_pouch_from_order ()
+
+	/**
+	 * Handle order status changes to update pouch status
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @param   string $old_status
+	 * @param   string $new_status
+	 * @param   WC_Order $order
+	 * @return  void
+	 */
+	public function handle_order_status_change( $order_id, $old_status, $new_status, $order ) {
+		// Get associated pouch
+		$pouch_id = $order->get_meta( '_pouch_id' );
+
+		if ( ! $pouch_id ) {
+			return;
+		}
+
+		// Map order statuses to pouch statuses
+		$status_mapping = array(
+			'processing' => 'new',
+			'shipped' => 'shipped',
+			'completed' => 'delivered',
+			'cancelled' => 'cancelled',
+			'refunded' => 'cancelled'
+		);
+
+		if ( isset( $status_mapping[ $new_status ] ) ) {
+			$new_pouch_status = $status_mapping[ $new_status ];
+			update_post_meta( $pouch_id, '_pouch_status', $new_pouch_status );
+
+			// Add order note about pouch status update
+			$order->add_order_note(
+				sprintf(
+					__( 'Pouch status updated to: %s', 'special-rate-shipping' ),
+					ucwords( str_replace( '_', ' ', $new_pouch_status ) )
+				)
+			);
+		}
+	} // End handle_order_status_change ()
+
+	/**
+	 * Determine optimal package type based on order items
+	 * @access  private
+	 * @since   2.0.0
+	 * @param   WC_Order $order
+	 * @return  string
+	 */
+	private function determine_optimal_package_type( $order ) {
+		$item_count = 0;
+		$total_weight = 0;
+
+		// Count items and calculate total weight
+		foreach ( $order->get_items() as $item ) {
+			$product = $item->get_product();
+			if ( $product ) {
+				$item_count += $item->get_quantity();
+				$weight = $product->get_weight();
+				if ( $weight ) {
+					$total_weight += ( $weight * $item->get_quantity() );
+				}
+			}
+		}
+
+		// Simple logic for package type determination
+		// This can be enhanced with more sophisticated rules
+		if ( $item_count <= 2 && $total_weight <= 1 ) {
+			return 'small_box';
+		} elseif ( $item_count <= 5 && $total_weight <= 5 ) {
+			return 'medium_box';
+		} else {
+			return 'big_box';
+		}
+	} // End determine_optimal_package_type ()
+
+	/**
+	 * Format shipping address for pouch
+	 * @access  private
+	 * @since   2.0.0
+	 * @param   WC_Order $order
+	 * @return  string
+	 */
+	private function format_shipping_address( $order ) {
+		$address_parts = array();
+
+		// Get shipping address
+		$first_name = $order->get_shipping_first_name();
+		$last_name = $order->get_shipping_last_name();
+		$company = $order->get_shipping_company();
+		$address_1 = $order->get_shipping_address_1();
+		$address_2 = $order->get_shipping_address_2();
+		$city = $order->get_shipping_city();
+		$state = $order->get_shipping_state();
+		$postcode = $order->get_shipping_postcode();
+		$country = $order->get_shipping_country();
+
+		// If no shipping address, use billing address
+		if ( empty( $first_name ) && empty( $address_1 ) ) {
+			$first_name = $order->get_billing_first_name();
+			$last_name = $order->get_billing_last_name();
+			$company = $order->get_billing_company();
+			$address_1 = $order->get_billing_address_1();
+			$address_2 = $order->get_billing_address_2();
+			$city = $order->get_billing_city();
+			$state = $order->get_billing_state();
+			$postcode = $order->get_billing_postcode();
+			$country = $order->get_billing_country();
+		}
+
+		// Build address string
+		if ( $first_name || $last_name ) {
+			$address_parts[] = trim( $first_name . ' ' . $last_name );
+		}
+
+		if ( $company ) {
+			$address_parts[] = $company;
+		}
+
+		if ( $address_1 ) {
+			$address_parts[] = $address_1;
+		}
+
+		if ( $address_2 ) {
+			$address_parts[] = $address_2;
+		}
+
+		if ( $city || $state || $postcode ) {
+			$city_state_zip = trim( $city . ', ' . $state . ' ' . $postcode );
+			$address_parts[] = $city_state_zip;
+		}
+
+		if ( $country ) {
+			$countries = WC()->countries->get_countries();
+			if ( isset( $countries[ $country ] ) ) {
+				$address_parts[] = $countries[ $country ];
+			}
+		}
+
+		return implode( "\n", $address_parts );
+	} // End format_shipping_address ()
+
+	/**
+	 * Add custom columns to pouch list
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   array $columns
+	 * @return  array
+	 */
+	public function add_pouch_columns( $columns ) {
+		$new_columns = array();
+		
+		// Keep title and date, add custom columns
+		$new_columns['cb'] = $columns['cb'];
+		$new_columns['title'] = $columns['title'];
+		$new_columns['pouch_status'] = __( 'Status', 'special-rate-shipping' );
+		$new_columns['pouch_order'] = __( 'Order', 'special-rate-shipping' );
+		$new_columns['pouch_package'] = __( 'Package Type', 'special-rate-shipping' );
+		$new_columns['pouch_barcode'] = __( 'Barcode', 'special-rate-shipping' );
+		$new_columns['pouch_products'] = __( 'Products', 'special-rate-shipping' );
+		$new_columns['date'] = $columns['date'];
+		
+		return $new_columns;
+	} // End add_pouch_columns ()
+
+	/**
+	 * Populate custom columns in pouch list
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   string $column
+	 * @param   int $post_id
+	 * @return  void
+	 */
+	public function populate_pouch_columns( $column, $post_id ) {
+		switch ( $column ) {
+			case 'pouch_status':
+				$status = get_post_meta( $post_id, '_pouch_status', true ) ?: 'new';
+				$status_labels = array(
+					'new' => __( 'New', 'special-rate-shipping' ),
+					'packed' => __( 'Packed', 'special-rate-shipping' ),
+					'shipped' => __( 'Shipped', 'special-rate-shipping' ),
+					'delivered' => __( 'Delivered', 'special-rate-shipping' ),
+					'cancelled' => __( 'Cancelled', 'special-rate-shipping' )
+				);
+				$status_label = isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : ucfirst( $status );
+				printf( '<span class="pouch-status status-%s">%s</span>', esc_attr( $status ), esc_html( $status_label ) );
+				break;
+
+			case 'pouch_order':
+				$order_id = get_post_meta( $post_id, '_order_id', true );
+				if ( $order_id ) {
+					$order = wc_get_order( $order_id );
+					if ( $order ) {
+						printf(
+							'<a href="%s" target="_blank">#%s</a><br><small>%s</small>',
+							esc_url( $order->get_edit_order_url() ),
+							esc_html( $order->get_order_number() ),
+							esc_html( wc_price( $order->get_total() ) )
+						);
+					} else {
+						printf( '<em>%s</em>', esc_html__( 'Order not found', 'special-rate-shipping' ) );
+					}
+				} else {
+					printf( '<em>%s</em>', esc_html__( 'Manual', 'special-rate-shipping' ) );
+				}
+				break;
+
+			case 'pouch_package':
+				$package_type = get_post_meta( $post_id, '_package_type', true );
+				$package_types = array(
+					'small_box' => __( 'Small Box', 'special-rate-shipping' ),
+					'medium_box' => __( 'Medium Box', 'special-rate-shipping' ),
+					'big_box' => __( 'Big Box', 'special-rate-shipping' ),
+					'envelope' => __( 'Envelope', 'special-rate-shipping' ),
+					'flat_rate' => __( 'Flat Rate Box', 'special-rate-shipping' )
+				);
+				$package_label = isset( $package_types[ $package_type ] ) ? $package_types[ $package_type ] : ucfirst( str_replace( '_', ' ', $package_type ) );
+				echo esc_html( $package_label );
+				break;
+
+			case 'pouch_barcode':
+				$barcode = get_post_meta( $post_id, '_barcode', true );
+				if ( $barcode ) {
+					printf(
+						'<code style="font-size: 11px; background: #f0f0f0; padding: 2px 4px;">%s</code>',
+						esc_html( $barcode )
+					);
+				} else {
+					printf( '<em>%s</em>', esc_html__( 'Not generated', 'special-rate-shipping' ) );
+				}
+				break;
+
+			case 'pouch_products':
+				$product_ids = get_post_meta( $post_id, '_pouch_products', true );
+				if ( ! empty( $product_ids ) && is_array( $product_ids ) ) {
+					$product_names = array();
+					foreach ( array_slice( $product_ids, 0, 3 ) as $product_id ) {
+						$product = wc_get_product( $product_id );
+						if ( $product ) {
+							$product_names[] = $product->get_name();
+						}
+					}
+					echo esc_html( implode( ', ', $product_names ) );
+					if ( count( $product_ids ) > 3 ) {
+						printf( ' <small>+%d more</small>', count( $product_ids ) - 3 );
+					}
+				} else {
+					printf( '<em>%s</em>', esc_html__( 'No products', 'special-rate-shipping' ) );
+				}
+				break;
+		}
+	} // End populate_pouch_columns ()
 
 	/**
 	 * Create the custom post type.
@@ -574,10 +1037,55 @@ class Special_Rate_Shipping {
 					<?php
 					$pouch_count = wp_count_posts( 'pouch' );
 					$total_pouches = $pouch_count->publish + $pouch_count->draft + $pouch_count->pending;
+
+					// Get automatic vs manual pouches
+					$automatic_pouches = get_posts( array(
+						'post_type' => 'pouch',
+						'posts_per_page' => -1,
+						'post_status' => 'any',
+						'meta_query' => array(
+							array(
+								'key' => '_order_id',
+								'compare' => 'EXISTS'
+							)
+						),
+						'fields' => 'ids'
+					) );
+					$automatic_count = count( $automatic_pouches );
+					$manual_count = $total_pouches - $automatic_count;
+
+					// Get status counts
+					$status_counts = array(
+						'new' => 0,
+						'packed' => 0,
+						'shipped' => 0,
+						'delivered' => 0
+					);
+
+					if ( $total_pouches > 0 ) {
+						global $wpdb;
+						$results = $wpdb->get_results(
+							"SELECT meta_value, COUNT(*) as count FROM {$wpdb->postmeta} pm 
+							 JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
+							 WHERE pm.meta_key = '_pouch_status' AND p.post_type = 'pouch' AND p.post_status != 'trash'
+							 GROUP BY meta_value"
+						);
+						foreach ( $results as $result ) {
+							if ( isset( $status_counts[ $result->meta_value ] ) ) {
+								$status_counts[ $result->meta_value ] = $result->count;
+							}
+						}
+					}
 					?>
-					<p><?php printf( esc_html__( 'Total Pouches: %d', 'special-rate-shipping' ), $total_pouches ); ?></p>
-					<p><?php printf( esc_html__( 'Published: %d', 'special-rate-shipping' ), $pouch_count->publish ); ?></p>
-					<p><?php printf( esc_html__( 'Draft: %d', 'special-rate-shipping' ), $pouch_count->draft ); ?></p>
+					<p><strong><?php printf( esc_html__( 'Total Pouches: %d', 'special-rate-shipping' ), $total_pouches ); ?></strong></p>
+					<p><?php printf( esc_html__( 'Automatic: %d', 'special-rate-shipping' ), $automatic_count ); ?></p>
+					<p><?php printf( esc_html__( 'Manual: %d', 'special-rate-shipping' ), $manual_count ); ?></p>
+					<hr>
+					<p><strong><?php esc_html_e( 'By Status:', 'special-rate-shipping' ); ?></strong></p>
+					<p><?php printf( esc_html__( 'New: %d', 'special-rate-shipping' ), $status_counts['new'] ); ?></p>
+					<p><?php printf( esc_html__( 'Packed: %d', 'special-rate-shipping' ), $status_counts['packed'] ); ?></p>
+					<p><?php printf( esc_html__( 'Shipped: %d', 'special-rate-shipping' ), $status_counts['shipped'] ); ?></p>
+					<p><?php printf( esc_html__( 'Delivered: %d', 'special-rate-shipping' ), $status_counts['delivered'] ); ?></p>
 				</div>
 			</div>
 			
