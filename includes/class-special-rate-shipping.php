@@ -1,4 +1,13 @@
 <?php
+/**
+ * Special Rate Shipping Main Class
+ *
+ * Main plugin class that handles initialization and core functionality.
+ *
+ * @package KobKob\SpecialRateShipping
+ * @author Monsenhor Ricardo Filipo <filipo@kobkob.org>
+ * @since 2.0.0
+ */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -8,7 +17,7 @@ class Special_Rate_Shipping {
 	 * The single instance of Special_Rate_Shipping.
 	 * @var 	object
 	 * @access  private
-	 * @since 	1.0.0
+	 * @since 	2.0.0
 	 */
 	private static $_instance = null;
 
@@ -16,15 +25,23 @@ class Special_Rate_Shipping {
 	 * Settings class object
 	 * @var     object
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $settings = null;
+
+	/**
+	 * Admin API class object
+	 * @var     object
+	 * @access  public
+	 * @since   2.0.0
+	 */
+	public $admin = null;
 
 	/**
 	 * The version number.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $_version;
 
@@ -32,7 +49,7 @@ class Special_Rate_Shipping {
 	 * The token.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $_token;
 
@@ -40,7 +57,7 @@ class Special_Rate_Shipping {
 	 * The main plugin file.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $file;
 
@@ -48,7 +65,7 @@ class Special_Rate_Shipping {
 	 * The main plugin directory.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $dir;
 
@@ -56,7 +73,7 @@ class Special_Rate_Shipping {
 	 * The plugin assets directory.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $assets_dir;
 
@@ -64,7 +81,7 @@ class Special_Rate_Shipping {
 	 * The plugin assets URL.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $assets_url;
 
@@ -72,14 +89,14 @@ class Special_Rate_Shipping {
 	 * Suffix for Javascripts.
 	 * @var     string
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 */
 	public $script_suffix;
 
 	/**
 	 * Constructor function.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function __construct ( $file = '', $version = '2.0.0' ) {
@@ -165,7 +182,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Create the custom post type.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return void
 	 */
 	public function create_post_types () {
@@ -257,7 +274,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load frontend CSS.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return void
 	 */
 	public function enqueue_styles () {
@@ -268,7 +285,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load frontend Javascript.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function enqueue_scripts () {
@@ -279,7 +296,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load admin CSS.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function admin_enqueue_styles ( $hook = '' ) {
@@ -290,7 +307,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load admin Javascript.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function admin_enqueue_scripts ( $hook = '' ) {
@@ -301,7 +318,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load plugin localisation
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function load_localisation () {
@@ -311,7 +328,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Load plugin textdomain
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function load_plugin_textdomain () {
@@ -328,7 +345,7 @@ class Special_Rate_Shipping {
 	 *
 	 * Ensures only one instance of Special_Rate_Shipping is loaded or can be loaded.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 * @static
 	 * @see Special_Rate_Shipping()
 	 * @return Main Special_Rate_Shipping instance
@@ -343,7 +360,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Cloning is forbidden.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 */
 	public function __clone () {
 		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ), $this->_version );
@@ -352,7 +369,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Unserializing instances of this class is forbidden.
 	 *
-	 * @since 1.0.0
+	 * @since 2.0.0
 	 */
 	public function __wakeup () {
 		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ), $this->_version );
@@ -361,7 +378,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Installation. Runs on activation.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	public function install () {
@@ -371,7 +388,7 @@ class Special_Rate_Shipping {
 	/**
 	 * Log the plugin version number.
 	 * @access  public
-	 * @since   1.0.0
+	 * @since   2.0.0
 	 * @return  void
 	 */
 	private function _log_version_number () {
