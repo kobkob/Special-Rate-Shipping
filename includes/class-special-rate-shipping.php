@@ -144,11 +144,11 @@ class Special_Rate_Shipping {
 		add_action( 'woocommerce_new_order', array( $this, 'maybe_create_pouch_from_new_order' ), 20, 1 );
 		add_action( 'woocommerce_thankyou', array( $this, 'maybe_create_pouch_from_thankyou' ), 10, 1 );
 		
-		// Additional debugging hooks
-		add_action( 'woocommerce_checkout_order_processed', array( $this, 'debug_order_processed' ), 5, 3 );
-		add_action( 'woocommerce_new_order', array( $this, 'debug_new_order' ), 10, 1 );
-		add_action( 'woocommerce_thankyou', array( $this, 'debug_thankyou' ), 10, 1 );
-		add_action( 'woocommerce_order_status_changed', array( $this, 'debug_status_change' ), 5, 4 );
+		// Additional debugging hooks (can be disabled in production)
+		// add_action( 'woocommerce_checkout_order_processed', array( $this, 'debug_order_processed' ), 5, 3 );
+		// add_action( 'woocommerce_new_order', array( $this, 'debug_new_order' ), 10, 1 );
+		// add_action( 'woocommerce_thankyou', array( $this, 'debug_thankyou' ), 10, 1 );
+		// add_action( 'woocommerce_order_status_changed', array( $this, 'debug_status_change' ), 5, 4 );
 
 		// Add custom columns to pouch list
 		add_filter( 'manage_pouch_posts_columns', array( $this, 'add_pouch_columns' ) );
@@ -270,6 +270,34 @@ class Special_Rate_Shipping {
 	 */
 	public function pouch_products_meta_box( $post ) {
 		$product_ids = get_post_meta( $post->ID, '_pouch_products', true ) ?: array();
+		$package_type = get_post_meta( $post->ID, '_package_type', true );
+
+		// Display summary information
+		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) :
+			$product_count = count( $product_ids );
+			$package_types = array(
+				'small_box' => __( 'Small Box', 'special-rate-shipping' ),
+				'medium_box' => __( 'Medium Box', 'special-rate-shipping' ),
+				'big_box' => __( 'Big Box', 'special-rate-shipping' ),
+				'envelope' => __( 'Envelope', 'special-rate-shipping' ),
+				'flat_rate' => __( 'Flat Rate Box', 'special-rate-shipping' )
+			);
+			$package_label = isset( $package_types[ $package_type ] ) ? $package_types[ $package_type ] : __( 'Not specified', 'special-rate-shipping' );
+			?>
+			<div class="pouch-summary" style="background: #f0f6fc; padding: 15px; margin-bottom: 20px; border: 1px solid #c3d4e5; border-radius: 5px;">
+				<h4 style="margin: 0 0 10px 0; color: #1d2327;"><?php esc_html_e( 'Packaging Summary', 'special-rate-shipping' ); ?></h4>
+				<div style="display: flex; gap: 20px; align-items: center;">
+					<div>
+						<strong><?php printf( esc_html__( '%d Products', 'special-rate-shipping' ), $product_count ); ?></strong>
+					</div>
+					<div>
+						<span class="dashicons dashicons-archive" style="color: #2271b1;"></span>
+						<strong><?php echo esc_html( $package_label ); ?></strong>
+					</div>
+				</div>
+			</div>
+			<?php
+		endif;
 
 		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) :
 			?>
@@ -548,9 +576,6 @@ class Special_Rate_Shipping {
 	 * @return  void
 	 */
 	public function maybe_create_pouch_from_order( $order_id ) {
-		// Debug: Log function entry
-		error_log( 'Special Rate Shipping: maybe_create_pouch_from_order called for order ' . $order_id );
-		
 		if ( ! $order_id ) {
 			return;
 		}
@@ -581,13 +606,13 @@ class Special_Rate_Shipping {
 			}
 		}
 
-		// Log debug information
-		error_log( sprintf( 
-			'Special Rate Shipping Debug - Order %d: Shipping methods found: %s, Uses special rate: %s', 
-			$order_id, 
-			implode( ', ', $shipping_method_debug ),
-			$uses_special_rate ? 'YES' : 'NO'
-		) );
+		// Optional debug information (uncomment for troubleshooting)
+		// error_log( sprintf( 
+		//	'Special Rate Shipping Debug - Order %d: Shipping methods found: %s, Uses special rate: %s', 
+		//	$order_id, 
+		//	implode( ', ', $shipping_method_debug ),
+		//	$uses_special_rate ? 'YES' : 'NO'
+		// ) );
 
 		if ( ! $uses_special_rate ) {
 			return;
@@ -661,8 +686,8 @@ class Special_Rate_Shipping {
 			$order->update_meta_data( '_pouch_id', $pouch_id );
 			$order->save();
 
-			// Log successful creation
-			error_log( sprintf( 'Special Rate Shipping: Created pouch %d for order %d', $pouch_id, $order_id ) );
+			// Log successful creation (can be disabled in production)
+			// error_log( sprintf( 'Special Rate Shipping: Created pouch %d for order %d', $pouch_id, $order_id ) );
 		}
 	} // End maybe_create_pouch_from_order ()
 
@@ -899,17 +924,38 @@ class Special_Rate_Shipping {
 
 			case 'pouch_products':
 				$product_ids = get_post_meta( $post_id, '_pouch_products', true );
+				$package_type = get_post_meta( $post_id, '_package_type', true );
+				
 				if ( ! empty( $product_ids ) && is_array( $product_ids ) ) {
+					$product_count = count( $product_ids );
+					$package_types = array(
+						'small_box' => __( 'S', 'special-rate-shipping' ),
+						'medium_box' => __( 'M', 'special-rate-shipping' ),
+						'big_box' => __( 'L', 'special-rate-shipping' ),
+						'envelope' => __( 'E', 'special-rate-shipping' ),
+						'flat_rate' => __( 'FR', 'special-rate-shipping' )
+					);
+					$package_short = isset( $package_types[ $package_type ] ) ? $package_types[ $package_type ] : '?';
+					
+					printf(
+						'<div style="display: flex; align-items: center; gap: 8px;"><span class="dashicons dashicons-products" style="color: #2271b1; font-size: 16px;"></span><strong>%d</strong> <span style="background: #f0f6fc; color: #2271b1; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold;">%s</span></div>',
+						$product_count,
+						esc_html( $package_short )
+					);
+					
+					// Show first few product names as tooltip or small text
 					$product_names = array();
-					foreach ( array_slice( $product_ids, 0, 3 ) as $product_id ) {
+					foreach ( array_slice( $product_ids, 0, 2 ) as $product_id ) {
 						$product = wc_get_product( $product_id );
 						if ( $product ) {
 							$product_names[] = $product->get_name();
 						}
 					}
-					echo esc_html( implode( ', ', $product_names ) );
-					if ( count( $product_ids ) > 3 ) {
-						printf( ' <small>+%d more</small>', count( $product_ids ) - 3 );
+					if ( ! empty( $product_names ) ) {
+						printf( '<small style="color: #646970; display: block; margin-top: 2px;">%s%s</small>', 
+							esc_html( implode( ', ', $product_names ) ),
+							$product_count > 2 ? '...' : ''
+						);
 					}
 				} else {
 					printf( '<em>%s</em>', esc_html__( 'No products', 'special-rate-shipping' ) );
@@ -984,7 +1030,7 @@ class Special_Rate_Shipping {
 			'manage_woocommerce',
 			'special-rate-system',
 			array( $this, 'admin_dashboard_page' ),
-			'dashicons-shipping',
+			'dashicons-shopping-cart',
 			56
 		);
 
@@ -1649,7 +1695,6 @@ City, State ZIP"></textarea>
 	 * @return  void
 	 */
 	public function maybe_create_pouch_from_new_order( $order_id ) {
-		error_log( 'Special Rate Shipping: maybe_create_pouch_from_new_order called for order ' . $order_id );
 		$this->maybe_create_pouch_from_order( $order_id );
 	} // End maybe_create_pouch_from_new_order ()
 
@@ -1664,7 +1709,6 @@ City, State ZIP"></textarea>
 		if ( ! $order_id ) {
 			return;
 		}
-		error_log( 'Special Rate Shipping: maybe_create_pouch_from_thankyou called for order ' . $order_id );
 		$this->maybe_create_pouch_from_order( $order_id );
 	} // End maybe_create_pouch_from_thankyou ()
 
