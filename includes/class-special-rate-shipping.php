@@ -140,10 +140,15 @@ class Special_Rate_Shipping {
 		// Hook into WooCommerce order processing
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'maybe_create_pouch_from_order' ), 10, 3 );
 		add_action( 'woocommerce_order_status_changed', array( $this, 'handle_order_status_change' ), 10, 4 );
+		// Alternative hooks for pouch creation
+		add_action( 'woocommerce_new_order', array( $this, 'maybe_create_pouch_from_new_order' ), 20, 1 );
+		add_action( 'woocommerce_thankyou', array( $this, 'maybe_create_pouch_from_thankyou' ), 10, 1 );
 		
 		// Additional debugging hooks
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'debug_order_processed' ), 5, 3 );
 		add_action( 'woocommerce_new_order', array( $this, 'debug_new_order' ), 10, 1 );
+		add_action( 'woocommerce_thankyou', array( $this, 'debug_thankyou' ), 10, 1 );
+		add_action( 'woocommerce_order_status_changed', array( $this, 'debug_status_change' ), 5, 4 );
 
 		// Add custom columns to pouch list
 		add_filter( 'manage_pouch_posts_columns', array( $this, 'add_pouch_columns' ) );
@@ -1604,5 +1609,63 @@ City, State ZIP"></textarea>
 			$order_id 
 		) );
 	} // End debug_new_order ()
+
+	/**
+	 * Debug function to track thank you page
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @return  void
+	 */
+	public function debug_thankyou( $order_id ) {
+		error_log( sprintf( 
+			'Special Rate Shipping Debug: Thank you page for order %d', 
+			$order_id 
+		) );
+	} // End debug_thankyou ()
+
+	/**
+	 * Debug function to track status changes
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @param   string $old_status
+	 * @param   string $new_status
+	 * @param   WC_Order $order
+	 * @return  void
+	 */
+	public function debug_status_change( $order_id, $old_status, $new_status, $order ) {
+		error_log( sprintf( 
+			'Special Rate Shipping Debug: Order %d status changed from %s to %s', 
+			$order_id, $old_status, $new_status
+		) );
+	} // End debug_status_change ()
+
+	/**
+	 * Alternative pouch creation from new order hook
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @return  void
+	 */
+	public function maybe_create_pouch_from_new_order( $order_id ) {
+		error_log( 'Special Rate Shipping: maybe_create_pouch_from_new_order called for order ' . $order_id );
+		$this->maybe_create_pouch_from_order( $order_id );
+	} // End maybe_create_pouch_from_new_order ()
+
+	/**
+	 * Alternative pouch creation from thank you page
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @return  void
+	 */
+	public function maybe_create_pouch_from_thankyou( $order_id ) {
+		if ( ! $order_id ) {
+			return;
+		}
+		error_log( 'Special Rate Shipping: maybe_create_pouch_from_thankyou called for order ' . $order_id );
+		$this->maybe_create_pouch_from_order( $order_id );
+	} // End maybe_create_pouch_from_thankyou ()
 
 }
