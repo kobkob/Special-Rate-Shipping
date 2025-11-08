@@ -140,6 +140,10 @@ class Special_Rate_Shipping {
 		// Hook into WooCommerce order processing
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'maybe_create_pouch_from_order' ), 10, 3 );
 		add_action( 'woocommerce_order_status_changed', array( $this, 'handle_order_status_change' ), 10, 4 );
+		
+		// Additional debugging hooks
+		add_action( 'woocommerce_checkout_order_processed', array( $this, 'debug_order_processed' ), 5, 3 );
+		add_action( 'woocommerce_new_order', array( $this, 'debug_new_order' ), 10, 1 );
 
 		// Add custom columns to pouch list
 		add_filter( 'manage_pouch_posts_columns', array( $this, 'add_pouch_columns' ) );
@@ -538,12 +542,15 @@ class Special_Rate_Shipping {
 	 * @param   WC_Order $order
 	 * @return  void
 	 */
-	public function maybe_create_pouch_from_order( $order_id, $posted_data, $order ) {
-		// Get the order
-		if ( ! $order ) {
-			$order = wc_get_order( $order_id );
+	public function maybe_create_pouch_from_order( $order_id ) {
+		// Debug: Log function entry
+		error_log( 'Special Rate Shipping: maybe_create_pouch_from_order called for order ' . $order_id );
+		
+		if ( ! $order_id ) {
+			return;
 		}
 
+		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
 			return;
 		}
@@ -552,15 +559,30 @@ class Special_Rate_Shipping {
 		$shipping_methods = $order->get_shipping_methods();
 		$uses_special_rate = false;
 		$selected_package_type = 'medium_box'; // default
+		$shipping_method_debug = array();
 
 		foreach ( $shipping_methods as $shipping_method ) {
-			if ( strpos( $shipping_method->get_method_id(), 'special_rate_shipping' ) !== false ) {
+			$method_id = $shipping_method->get_method_id();
+			$shipping_method_debug[] = $method_id;
+			
+			// Check for both shipping method variations
+			if ( strpos( $method_id, 'special_rate_shipping' ) !== false || 
+				 $method_id === 'special_rate_shipping_method' ||
+				 $method_id === 'special_rate_shipping_enhanced_method' ) {
 				$uses_special_rate = true;
 				// Try to determine the best package type based on items
 				$selected_package_type = $this->determine_optimal_package_type( $order );
 				break;
 			}
 		}
+
+		// Log debug information
+		error_log( sprintf( 
+			'Special Rate Shipping Debug - Order %d: Shipping methods found: %s, Uses special rate: %s', 
+			$order_id, 
+			implode( ', ', $shipping_method_debug ),
+			$uses_special_rate ? 'YES' : 'NO'
+		) );
 
 		if ( ! $uses_special_rate ) {
 			return;
@@ -1552,5 +1574,35 @@ City, State ZIP"></textarea>
 	private function _log_version_number () {
 		update_option( $this->_token . '_version', $this->_version );
 	} // End _log_version_number ()
+
+	/**
+	 * Debug function to track order processing
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @param   array $posted_data
+	 * @param   WC_Order $order
+	 * @return  void
+	 */
+	public function debug_order_processed( $order_id, $posted_data, $order ) {
+		error_log( sprintf( 
+			'Special Rate Shipping Debug: Order processed hook fired for order %d', 
+			$order_id 
+		) );
+	} // End debug_order_processed ()
+
+	/**
+	 * Debug function to track new orders
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   int $order_id
+	 * @return  void
+	 */
+	public function debug_new_order( $order_id ) {
+		error_log( sprintf( 
+			'Special Rate Shipping Debug: New order hook fired for order %d', 
+			$order_id 
+		) );
+	} // End debug_new_order ()
 
 }
