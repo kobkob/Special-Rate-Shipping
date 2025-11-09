@@ -283,14 +283,24 @@ class Special_Rate_Shipping {
 	 */
 	public function pouch_products_meta_box( $post ) {
 		$product_ids = get_post_meta( $post->ID, '_pouch_products', true ) ?: array();
+		$products_data = get_post_meta( $post->ID, '_pouch_products_data', true ) ?: array();
 		$package_type = get_post_meta( $post->ID, '_package_type', true );
 		$optimization_result = get_post_meta( $post->ID, '_optimization_result', true );
 		$calculated_cost = get_post_meta( $post->ID, '_calculated_shipping_cost', true );
+		$total_items = get_post_meta( $post->ID, '_total_items', true ) ?: 0;
+		$total_weight = get_post_meta( $post->ID, '_total_weight', true ) ?: 0;
+		$total_value = get_post_meta( $post->ID, '_total_value', true ) ?: 0;
 
-		// Display summary information
-		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) :
-			$product_count = count( $product_ids );
+		// Use detailed products data if available, fallback to product IDs
+		$has_detailed_data = ! empty( $products_data ) && is_array( $products_data );
+		$display_products = $has_detailed_data ? $products_data : $product_ids;
+
+		// Display enhanced summary information
+		if ( ! empty( $display_products ) && is_array( $display_products ) ) :
+			$product_count = $has_detailed_data ? count( $products_data ) : count( $product_ids );
 			$package_types = array(
+				'auto' => __( 'Auto-Optimize', 'special-rate-shipping' ),
+				'optimized' => __( 'Optimized Mix', 'special-rate-shipping' ),
 				'small_box' => __( 'Small Box', 'special-rate-shipping' ),
 				'medium_box' => __( 'Medium Box', 'special-rate-shipping' ),
 				'big_box' => __( 'Big Box', 'special-rate-shipping' ),
@@ -298,31 +308,83 @@ class Special_Rate_Shipping {
 				'flat_rate' => __( 'Flat Rate Box', 'special-rate-shipping' )
 			);
 			$package_label = isset( $package_types[ $package_type ] ) ? $package_types[ $package_type ] : __( 'Not specified', 'special-rate-shipping' );
+			
+			// Calculate totals if not stored
+			if ( $has_detailed_data && ( $total_items == 0 || $total_weight == 0 ) ) {
+				$total_items = 0;
+				$total_weight = 0;
+				$total_value = 0;
+				foreach ( $products_data as $item ) {
+					$product = wc_get_product( $item['product_id'] );
+					if ( $product ) {
+						$quantity = $item['quantity'] ?: 1;
+						$weight = $item['weight'] ?: $product->get_weight() ?: 0;
+						$total_items += $quantity;
+						$total_weight += $weight * $quantity;
+						$total_value += $product->get_price() * $quantity;
+					}
+				}
+			}
 			?>
-			<div class="pouch-summary" style="background: #f0f6fc; padding: 15px; margin-bottom: 20px; border: 1px solid #c3d4e5; border-radius: 5px;">
-				<h4 style="margin: 0 0 10px 0; color: #1d2327;"><?php esc_html_e( 'Packaging Summary', 'special-rate-shipping' ); ?></h4>
-				<div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-					<div>
-						<span class="dashicons dashicons-products" style="color: #2271b1;"></span>
-						<strong><?php printf( esc_html__( '%d Products', 'special-rate-shipping' ), $product_count ); ?></strong>
+			<!-- Enhanced Bootstrap Summary -->
+			<div class="card border-primary mb-3">
+				<div class="card-header bg-primary text-white">
+					<h5 class="mb-0">
+						<i class="dashicons dashicons-chart-bar" style="vertical-align: text-top;"></i>
+						<?php esc_html_e( 'Pouch Summary', 'special-rate-shipping' ); ?>
+					</h5>
+				</div>
+				<div class="card-body">
+					<div class="row g-3">
+						<div class="col-md-3 text-center">
+							<div class="border rounded p-2">
+								<i class="dashicons dashicons-products text-primary" style="font-size: 24px;"></i>
+								<div class="fw-bold"><?php echo esc_html( $product_count ); ?></div>
+								<small class="text-muted"><?php esc_html_e( 'Product Types', 'special-rate-shipping' ); ?></small>
+							</div>
+						</div>
+						<div class="col-md-3 text-center">
+							<div class="border rounded p-2">
+								<i class="dashicons dashicons-list-view text-success" style="font-size: 24px;"></i>
+								<div class="fw-bold"><?php echo esc_html( $total_items ); ?></div>
+								<small class="text-muted"><?php esc_html_e( 'Total Items', 'special-rate-shipping' ); ?></small>
+							</div>
+						</div>
+						<div class="col-md-3 text-center">
+							<div class="border rounded p-2">
+								<i class="dashicons dashicons-scale text-warning" style="font-size: 24px;"></i>
+								<div class="fw-bold"><?php printf( '%.2f lbs', $total_weight ); ?></div>
+								<small class="text-muted"><?php esc_html_e( 'Total Weight', 'special-rate-shipping' ); ?></small>
+							</div>
+						</div>
+						<div class="col-md-3 text-center">
+							<div class="border rounded p-2">
+								<i class="dashicons dashicons-money-alt text-info" style="font-size: 24px;"></i>
+								<div class="fw-bold"><?php echo wp_kses_post( wc_price( $total_value ) ); ?></div>
+								<small class="text-muted"><?php esc_html_e( 'Total Value', 'special-rate-shipping' ); ?></small>
+							</div>
+						</div>
 					</div>
-					<div>
-						<span class="dashicons dashicons-archive" style="color: #2271b1;"></span>
-						<strong><?php echo esc_html( $package_label ); ?></strong>
-					</div>
-					<?php if ( $optimization_result && is_array( $optimization_result ) ) : ?>
-						<div>
-							<span class="dashicons dashicons-chart-line" style="color: #2271b1;"></span>
-							<strong><?php printf( esc_html__( '%d Packages', 'special-rate-shipping' ), $optimization_result['total_packages'] ?? 1 ); ?></strong>
+					
+					<!-- Package Type & Shipping Cost -->
+					<div class="row mt-3">
+						<div class="col-md-6">
+							<div class="alert alert-info mb-0">
+								<strong><?php esc_html_e( 'Package Type:', 'special-rate-shipping' ); ?></strong>
+								<br><?php echo esc_html( $package_label ); ?>
+							</div>
 						</div>
 						<?php if ( $calculated_cost > 0 ) : ?>
-							<div>
-								<span class="dashicons dashicons-money-alt" style="color: #2271b1;"></span>
-								<strong><?php printf( esc_html__( '$%.2f Cost', 'special-rate-shipping' ), $calculated_cost ); ?></strong>
+						<div class="col-md-6">
+							<div class="alert alert-success mb-0">
+								<strong><?php esc_html_e( 'Shipping Cost:', 'special-rate-shipping' ); ?></strong>
+								<br><?php echo wp_kses_post( wc_price( $calculated_cost ) ); ?>
 							</div>
+						</div>
 						<?php endif; ?>
-					<?php endif; ?>
+					</div>
 				</div>
+			</div>
 				
 				<?php if ( $optimization_result && is_array( $optimization_result ) && ! empty( $optimization_result['packages'] ) ) : ?>
 					<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #c3d4e5;">
@@ -343,64 +405,160 @@ class Special_Rate_Shipping {
 			<?php
 		endif;
 
-		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) :
-			?>
-			<table class="widefat striped">
-				<thead>
+		<!-- Product Details Table -->
+		<div class="table-responsive">
+			<table class="table table-striped table-hover">
+				<thead class="table-light">
 					<tr>
 						<th><?php esc_html_e( 'Product', 'special-rate-shipping' ); ?></th>
-						<th><?php esc_html_e( 'SKU', 'special-rate-shipping' ); ?></th>
-						<th><?php esc_html_e( 'Price', 'special-rate-shipping' ); ?></th>
-						<th><?php esc_html_e( 'Stock', 'special-rate-shipping' ); ?></th>
+						<th width="80"><?php esc_html_e( 'Qty', 'special-rate-shipping' ); ?></th>
+						<th width="100"><?php esc_html_e( 'Unit Price', 'special-rate-shipping' ); ?></th>
+						<th width="80"><?php esc_html_e( 'Weight', 'special-rate-shipping' ); ?></th>
+						<th width="100"><?php esc_html_e( 'Total', 'special-rate-shipping' ); ?></th>
+						<th width="80"><?php esc_html_e( 'Stock', 'special-rate-shipping' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $product_ids as $product_id ) :
-						$product = wc_get_product( $product_id );
-						if ( $product ) :
-						?>
-						<tr>
-							<td>
-								<strong><?php echo esc_html( $product->get_name() ); ?></strong>
-								<?php if ( $product->get_description() ) : ?>
-									<br><small><?php echo wp_kses_post( wp_trim_words( $product->get_description(), 15 ) ); ?></small>
-								<?php endif; ?>
-							</td>
-							<td><?php echo esc_html( $product->get_sku() ?: '—' ); ?></td>
-							<td><?php echo wp_kses_post( wc_price( $product->get_price() ) ); ?></td>
-							<td>
-								<?php 
-								if ( $product->is_in_stock() ) {
-									if ( $product->managing_stock() ) {
-										printf( esc_html__( '%d in stock', 'special-rate-shipping' ), $product->get_stock_quantity() );
-									} else {
-										esc_html_e( 'In stock', 'special-rate-shipping' );
-									}
-								} else {
-									echo '<span style="color: #d63638;">' . esc_html__( 'Out of stock', 'special-rate-shipping' ) . '</span>';
-								}
+					<?php 
+					if ( $has_detailed_data ) :
+						// Display detailed products with quantities
+						foreach ( $products_data as $item ) :
+							$product = wc_get_product( $item['product_id'] );
+							if ( $product ) :
+								$quantity = $item['quantity'] ?: 1;
+								$unit_weight = $item['weight'] ?: $product->get_weight() ?: 0;
+								$unit_price = $product->get_price();
+								$total_price = $unit_price * $quantity;
 								?>
-							</td>
-						</tr>
-						<?php 
-						else :
-						?>
-						<tr>
-							<td colspan="4">
-								<em><?php printf( esc_html__( 'Product ID %d not found or deleted', 'special-rate-shipping' ), $product_id ); ?></em>
-							</td>
-						</tr>
-						<?php 
-						endif;
-					endforeach; ?>
+								<tr>
+									<td>
+										<div class="d-flex align-items-center">
+											<?php if ( $product->get_image_id() ) : ?>
+												<img src="<?php echo esc_url( wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) ); ?>" 
+													 class="me-2" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" alt="">
+											<?php endif; ?>
+											<div>
+												<strong><?php echo esc_html( $product->get_name() ); ?></strong>
+												<?php if ( $product->get_sku() ) : ?>
+													<br><small class="text-muted">SKU: <?php echo esc_html( $product->get_sku() ); ?></small>
+												<?php endif; ?>
+											</div>
+										</div>
+									</td>
+									<td><span class="badge bg-primary"><?php echo esc_html( $quantity ); ?></span></td>
+									<td><?php echo wp_kses_post( wc_price( $unit_price ) ); ?></td>
+									<td><?php printf( '%.2f lbs', $unit_weight ); ?></td>
+									<td><strong><?php echo wp_kses_post( wc_price( $total_price ) ); ?></strong></td>
+									<td>
+										<?php 
+										if ( $product->is_in_stock() ) {
+											if ( $product->managing_stock() ) {
+												$stock_qty = $product->get_stock_quantity();
+												if ( $stock_qty >= $quantity ) {
+													echo '<span class="badge bg-success">' . esc_html( $stock_qty ) . '</span>';
+												} else {
+													echo '<span class="badge bg-warning">' . esc_html( $stock_qty ) . '</span>';
+												}
+											} else {
+												echo '<span class="badge bg-success">' . esc_html__( '∞', 'special-rate-shipping' ) . '</span>';
+											}
+										} else {
+											echo '<span class="badge bg-danger">' . esc_html__( 'Out', 'special-rate-shipping' ) . '</span>';
+										}
+										?>
+									</td>
+								</tr>
+								<?php
+							else :
+								?>
+								<tr>
+									<td colspan="6" class="text-muted fst-italic">
+										<?php printf( esc_html__( 'Product ID %d not found or deleted', 'special-rate-shipping' ), $item['product_id'] ); ?>
+									</td>
+								</tr>
+								<?php
+							endif;
+						endforeach;
+					else :
+						// Fallback for legacy data without quantities
+						foreach ( $product_ids as $product_id ) :
+							$product = wc_get_product( $product_id );
+							if ( $product ) :
+								?>
+								<tr>
+									<td>
+										<strong><?php echo esc_html( $product->get_name() ); ?></strong>
+										<?php if ( $product->get_sku() ) : ?>
+											<br><small class="text-muted">SKU: <?php echo esc_html( $product->get_sku() ); ?></small>
+										<?php endif; ?>
+									</td>
+									<td><span class="badge bg-secondary">?</span></td>
+									<td><?php echo wp_kses_post( wc_price( $product->get_price() ) ); ?></td>
+									<td><?php printf( '%.2f lbs', $product->get_weight() ?: 0 ); ?></td>
+									<td>—</td>
+									<td>
+										<?php 
+										if ( $product->is_in_stock() ) {
+											echo '<span class="badge bg-success">' . esc_html__( 'In Stock', 'special-rate-shipping' ) . '</span>';
+										} else {
+											echo '<span class="badge bg-danger">' . esc_html__( 'Out', 'special-rate-shipping' ) . '</span>';
+										}
+										?>
+									</td>
+								</tr>
+								<?php
+							else :
+								?>
+								<tr>
+									<td colspan="6" class="text-muted fst-italic">
+										<?php printf( esc_html__( 'Product ID %d not found or deleted', 'special-rate-shipping' ), $product_id ); ?>
+									</td>
+								</tr>
+								<?php
+							endif;
+						endforeach;
+					endif;
+					?>
 				</tbody>
 			</table>
+		</div>
 			<?php
 		else :
 			?>
-			<p><?php esc_html_e( 'No products assigned to this pouch yet.', 'special-rate-shipping' ); ?></p>
+			<div class="alert alert-info">
+				<i class="dashicons dashicons-info" style="vertical-align: text-top;"></i>
+				<?php esc_html_e( 'No products assigned to this pouch yet.', 'special-rate-shipping' ); ?>
+			</div>
 			<?php
 		endif;
+		
+		// Add Bootstrap CSS for admin pages
+		?>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+		<style>
+		/* WordPress admin compatibility */
+		.postbox .inside {
+			padding: 0;
+		}
+		.card {
+			border-color: #c3d4e5;
+		}
+		.text-primary { color: #2271b1 !important; }
+		.text-success { color: #00a32a !important; }
+		.text-warning { color: #dba617 !important; }
+		.text-info { color: #72aee6 !important; }
+		.bg-primary { background-color: #2271b1 !important; }
+		.bg-success { background-color: #00a32a !important; }
+		.bg-warning { background-color: #dba617 !important; }
+		.bg-info { background-color: #72aee6 !important; }
+		.alert {
+			margin-bottom: 1rem;
+		}
+		.badge {
+			font-size: 0.75em;
+		}
+		</style>
+		<?php
 	} // End pouch_products_meta_box ()
 
 	/**
@@ -1532,18 +1690,18 @@ class Special_Rate_Shipping {
 										<div class="row mb-4">
 											<div class="col-12">
 												<div class="mb-3">
-													<label for="pouch_products" class="form-label fw-bold">
+													<label class="form-label fw-bold">
 														<i class="dashicons dashicons-products" style="vertical-align: text-top;"></i>
-														<?php esc_html_e( 'Products', 'special-rate-shipping' ); ?>
+														<?php esc_html_e( 'Products & Quantities', 'special-rate-shipping' ); ?>
 													</label>
-													<select id="pouch_products" name="pouch_products[]" multiple class="form-select" style="min-height: 150px;">
-														<?php foreach ( $products as $product ) : ?>
-															<option value="<?php echo esc_attr( $product->get_id() ); ?>">
-																<?php echo esc_html( $product->get_name() . ' - $' . $product->get_price() ); ?>
-															</option>
-														<?php endforeach; ?>
-													</select>
-													<div class="form-text"><?php esc_html_e( 'Select products to include in this pouch. Hold Ctrl/Cmd to select multiple.', 'special-rate-shipping' ); ?></div>
+													<div id="product-list-container">
+														<!-- Product items will be dynamically added here -->
+													</div>
+													<button type="button" class="btn btn-outline-success btn-sm mt-2" id="add-product-btn">
+														<i class="dashicons dashicons-plus-alt" style="font-size: 14px; vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Add Product', 'special-rate-shipping' ); ?>
+													</button>
+													<div class="form-text"><?php esc_html_e( 'Add products and specify quantities for this pouch.', 'special-rate-shipping' ); ?></div>
 												</div>
 											</div>
 										</div>
@@ -1700,9 +1858,163 @@ class Special_Rate_Shipping {
 								</div>
 							</div>
 						</div>
-					</div>
+						</div>
 				</div>
 			</div>
+			
+			<!-- Product Selection Script -->
+			<script>
+			const products = <?php echo json_encode( array_map( function( $product ) {
+				return [
+					'id' => $product->get_id(),
+					'name' => $product->get_name(),
+					'price' => $product->get_price(),
+					'sku' => $product->get_sku(),
+					'weight' => $product->get_weight() ?: 0,
+					'stock_quantity' => $product->get_stock_quantity() ?: 999
+				];
+			}, $products ) ); ?>;
+			
+			let productCount = 0;
+			
+			document.addEventListener('DOMContentLoaded', function() {
+				const addProductBtn = document.getElementById('add-product-btn');
+				const productContainer = document.getElementById('product-list-container');
+				
+				// Add first product row by default
+				addProductRow();
+				
+				addProductBtn.addEventListener('click', function() {
+					addProductRow();
+				});
+				
+				function addProductRow() {
+					const row = document.createElement('div');
+					row.className = 'product-row card border mb-3';
+					row.innerHTML = `
+						<div class="card-body">
+							<div class="row align-items-end">
+								<div class="col-md-6">
+									<label class="form-label small fw-bold"><?php esc_html_e( 'Product', 'special-rate-shipping' ); ?></label>
+									<select name="products[${productCount}][product_id]" class="form-select product-select" required>
+										<option value=""><?php esc_html_e( 'Select a product...', 'special-rate-shipping' ); ?></option>
+										${products.map(p => `<option value="${p.id}" data-price="${p.price}" data-weight="${p.weight}" data-stock="${p.stock_quantity}">${p.name} - $${p.price} ${p.sku ? '(' + p.sku + ')' : ''}</option>`).join('')}
+									</select>
+								</div>
+								<div class="col-md-2">
+									<label class="form-label small fw-bold"><?php esc_html_e( 'Quantity', 'special-rate-shipping' ); ?></label>
+									<input type="number" name="products[${productCount}][quantity]" class="form-control quantity-input" min="1" value="1" required>
+								</div>
+								<div class="col-md-2">
+									<label class="form-label small fw-bold"><?php esc_html_e( 'Unit Weight', 'special-rate-shipping' ); ?></label>
+									<input type="number" name="products[${productCount}][weight]" class="form-control weight-input" step="0.01" min="0" placeholder="0.00" readonly>
+								</div>
+								<div class="col-md-2">
+									<button type="button" class="btn btn-outline-danger btn-sm remove-product-btn w-100" onclick="removeProductRow(this)">
+										<i class="dashicons dashicons-trash" style="font-size: 14px; vertical-align: text-top;"></i>
+										<?php esc_html_e( 'Remove', 'special-rate-shipping' ); ?>
+									</button>
+								</div>
+							</div>
+							<div class="row mt-2">
+								<div class="col-12">
+									<div class="product-info alert alert-info d-none" style="font-size: 12px; padding: 8px;"></div>
+								</div>
+							</div>
+						</div>
+					`;
+					
+					productContainer.appendChild(row);
+					
+					// Add event listener for product selection
+					const productSelect = row.querySelector('.product-select');
+					const weightInput = row.querySelector('.weight-input');
+					const quantityInput = row.querySelector('.quantity-input');
+					const productInfo = row.querySelector('.product-info');
+					
+					productSelect.addEventListener('change', function() {
+						const selectedOption = this.options[this.selectedIndex];
+						if (selectedOption.value) {
+							const price = selectedOption.getAttribute('data-price');
+							const weight = selectedOption.getAttribute('data-weight');
+							const stock = selectedOption.getAttribute('data-stock');
+							
+							weightInput.value = weight;
+							quantityInput.max = stock;
+							
+							productInfo.innerHTML = `
+								<strong><?php esc_html_e( 'Product Info:', 'special-rate-shipping' ); ?></strong> 
+								$${price} each, ${weight}lbs unit weight, ${stock} in stock
+							`;
+							productInfo.classList.remove('d-none');
+						} else {
+							weightInput.value = '';
+							productInfo.classList.add('d-none');
+						}
+						updateTotalSummary();
+					});
+					
+					quantityInput.addEventListener('change', updateTotalSummary);
+					
+					productCount++;
+					updateRemoveButtons();
+				}
+				
+				window.removeProductRow = function(btn) {
+					const row = btn.closest('.product-row');
+					row.remove();
+					updateRemoveButtons();
+					updateTotalSummary();
+				};
+				
+				function updateRemoveButtons() {
+					const rows = document.querySelectorAll('.product-row');
+					rows.forEach((row, index) => {
+						const removeBtn = row.querySelector('.remove-product-btn');
+						// Always allow removal if there's more than one row
+						removeBtn.style.display = rows.length > 1 ? 'block' : 'none';
+					});
+				}
+				
+				function updateTotalSummary() {
+					const rows = document.querySelectorAll('.product-row');
+					let totalItems = 0;
+					let totalWeight = 0;
+					let totalValue = 0;
+					
+					rows.forEach(row => {
+						const select = row.querySelector('.product-select');
+						const quantity = parseInt(row.querySelector('.quantity-input').value) || 0;
+						
+						if (select.value && quantity > 0) {
+							const option = select.options[select.selectedIndex];
+							const price = parseFloat(option.getAttribute('data-price')) || 0;
+							const weight = parseFloat(option.getAttribute('data-weight')) || 0;
+							
+							totalItems += quantity;
+							totalWeight += weight * quantity;
+							totalValue += price * quantity;
+						}
+					});
+					
+					// Update or create summary display
+					let summary = document.getElementById('products-summary');
+					if (!summary) {
+						summary = document.createElement('div');
+						summary.id = 'products-summary';
+						summary.className = 'alert alert-secondary mt-3';
+						document.getElementById('product-list-container').parentNode.appendChild(summary);
+					}
+					
+					summary.innerHTML = `
+						<strong><?php esc_html_e( 'Pouch Summary:', 'special-rate-shipping' ); ?></strong> 
+						${totalItems} <?php esc_html_e( 'items', 'special-rate-shipping' ); ?>, 
+						${totalWeight.toFixed(2)} <?php esc_html_e( 'lbs total weight', 'special-rate-shipping' ); ?>, 
+						$${totalValue.toFixed(2)} <?php esc_html_e( 'total value', 'special-rate-shipping' ); ?>
+					`;
+				}
+			});
+			</script>
 		<?php
 	} // End admin_create_pouch_page ()
 
@@ -1715,16 +2027,79 @@ class Special_Rate_Shipping {
 	private function handle_create_pouch_form() {
 		// Sanitize and validate input
 		$title = sanitize_text_field( $_POST['pouch_title'] );
-		$products = isset( $_POST['pouch_products'] ) ? array_map( 'intval', $_POST['pouch_products'] ) : array();
 		$package_type = sanitize_text_field( $_POST['package_type'] );
 		$recipient_info = sanitize_textarea_field( $_POST['recipient_info'] );
 		$notes = sanitize_textarea_field( $_POST['pouch_notes'] );
+		
+		// Process products with quantities
+		$products_data = array();
+		$product_ids = array(); // For backward compatibility
+		
+		if ( isset( $_POST['products'] ) && is_array( $_POST['products'] ) ) {
+			foreach ( $_POST['products'] as $product_item ) {
+				if ( isset( $product_item['product_id'] ) && !empty( $product_item['product_id'] ) ) {
+					$product_id = intval( $product_item['product_id'] );
+					$quantity = intval( $product_item['quantity'] ) ?: 1;
+					$weight = floatval( $product_item['weight'] ) ?: 0;
+					
+					// Validate product exists
+					if ( wc_get_product( $product_id ) ) {
+						$products_data[] = array(
+							'product_id' => $product_id,
+							'quantity' => $quantity,
+							'weight' => $weight
+						);
+						$product_ids[] = $product_id; // For backward compatibility
+					}
+				}
+			}
+		}
 
-		if ( empty( $title ) || empty( $package_type ) ) {
+		if ( empty( $title ) || empty( $package_type ) || empty( $products_data ) ) {
 			add_action( 'admin_notices', function() {
-				echo '<div class="notice notice-error"><p>' . esc_html__( 'Title and Package Type are required fields.', 'special-rate-shipping' ) . '</p></div>';
+				echo '<div class="notice notice-error"><p>' . esc_html__( 'Title, Package Type, and at least one product are required.', 'special-rate-shipping' ) . '</p></div>';
 			} );
 			return;
+		}
+
+		// Calculate totals for optimization
+		$total_weight = 0;
+		$total_value = 0;
+		$total_items = 0;
+		
+		foreach ( $products_data as $product_item ) {
+			$product = wc_get_product( $product_item['product_id'] );
+			if ( $product ) {
+				$quantity = $product_item['quantity'];
+				$weight = $product_item['weight'] ?: $product->get_weight();
+				
+				$total_items += $quantity;
+				$total_weight += $weight * $quantity;
+				$total_value += $product->get_price() * $quantity;
+			}
+		}
+		
+		// Run package optimization if auto-optimize is selected
+		$optimization_result = null;
+		$calculated_cost = 0;
+		
+		if ( $package_type === 'auto' && class_exists( 'Package_Optimizer' ) ) {
+			try {
+				$optimizer = new Package_Optimizer();
+				$optimization_result = $optimizer->optimize_packages( $products_data, array(
+					'weight' => $total_weight,
+					'value' => $total_value,
+					'items' => $total_items
+				) );
+				
+				if ( $optimization_result && isset( $optimization_result['total_cost'] ) ) {
+					$calculated_cost = $optimization_result['total_cost'];
+					$package_type = 'optimized'; // Mark as optimized
+				}
+			} catch ( Exception $e ) {
+				// Log error but continue with manual package type
+				error_log( 'Package optimization failed: ' . $e->getMessage() );
+			}
 		}
 
 		// Create the pouch post
@@ -1734,13 +2109,19 @@ class Special_Rate_Shipping {
 			'post_status' => 'draft',
 			'post_type' => 'pouch',
 			'meta_input' => array(
-				'_pouch_products' => $products,
+				'_pouch_products' => $product_ids, // Backward compatibility
+				'_pouch_products_data' => $products_data, // New detailed structure
 				'_package_type' => $package_type,
 				'_recipient_info' => $recipient_info,
 				'_pouch_notes' => $notes,
 				'_pouch_status' => 'new',
 				'_created_date' => current_time( 'mysql' ),
-				'_barcode' => $this->generate_barcode()
+				'_barcode' => $this->generate_barcode(),
+				'_total_items' => $total_items,
+				'_total_weight' => $total_weight,
+				'_total_value' => $total_value,
+				'_optimization_result' => $optimization_result,
+				'_calculated_shipping_cost' => $calculated_cost
 			)
 		);
 
