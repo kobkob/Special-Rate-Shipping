@@ -3,20 +3,40 @@
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-purple.svg)](https://woocommerce.com/)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net/)
+[![USPS](https://img.shields.io/badge/USPS_API-Integrated-orange.svg)](https://developer.usps.com/)
 [![License](https://img.shields.io/badge/License-GPL--2.0%2B-green.svg)](LICENSE)
 
-A modern WooCommerce extension providing intelligent shipping rates based on product types and quantities with sophisticated packaging optimization algorithms.
+**The most advanced WooCommerce shipping solution with intelligent package optimization, USPS API integration, and automated pouch management system.**
 
-## 🚀 Features
+## ✨ **Version 2.0 - Major Release Features**
 
-- **Intelligent Package Optimization**: Automatically selects the most cost-effective combination of package types
-- **Flexible Shipping Classes**: Configure different packaging rules for various product types
-- **Three Package Types**: Small, Medium, and Big boxes with customizable rates and item limits
-- **Modern Architecture**: Built with PHP 8.1+, proper namespacing, and current WordPress standards
-- **Real-time Calculation**: Dynamic shipping cost calculation based on cart contents
-- **Admin Interface**: Intuitive settings with real-time validation and testing tools
-- **Debug Support**: Built-in debugging tools for development and troubleshooting
-- **Mobile Responsive**: Fully responsive admin interface
+### 🎯 **Intelligent Package Optimization Engine**
+- **Advanced Algorithm**: Finds the most cost-effective package combinations using sophisticated optimization
+- **5 Package Types**: Small Box, Medium Box, Big Box, Envelope, Flat Rate Box
+- **Mixed Packaging**: Automatically combines different package types for optimal pricing
+- **Weight & Dimension Aware**: Considers product weights and dimensions for realistic packaging
+- **Memory Efficient**: Uses PHP generators for handling large product combinations
+
+### 📦 **Automated Pouch Management System**
+- **Auto-Creation**: Automatically creates shipping pouches from WooCommerce orders
+- **Visual Interface**: Professional admin interface with Bootstrap styling and visual package breakdown
+- **Barcode Generation**: Automatic barcode creation with QR code integration
+- **Status Tracking**: Complete pouch lifecycle management (New → Packed → Shipped → Delivered)
+- **Order Integration**: Bi-directional linking between orders and pouches
+
+### 🚚 **USPS API Integration**
+- **Real-time Rates**: Live USPS rates with intelligent fallbacks
+- **Label Generation**: Professional USPS shipping labels (PDF download)
+- **Tracking Integration**: Automatic tracking number assignment and display
+- **OAuth2 Authentication**: Secure, modern USPS API authentication
+- **Sandbox/Production**: Full development and production environment support
+
+### 🎨 **Modern Admin Interface**
+- **Bootstrap UI**: Professional, responsive interface with modern styling
+- **Visual Package Breakdown**: Interactive displays showing optimization results
+- **Dashboard Analytics**: Comprehensive statistics and package optimization insights
+- **AJAX Operations**: Smooth, real-time operations without page reloads
+- **Error Handling**: Graceful error handling with user-friendly messages
 
 ## 📋 Requirements
 
@@ -54,41 +74,104 @@ npm run build:dev
 npm run build
 ```
 
-## ⚙️ Configuration
+## 🚀 **Quick Start Guide**
 
-### Basic Setup
+### 1️⃣ **Basic Setup** (5 minutes)
 
-1. Go to **WooCommerce > Settings > Shipping**
-2. Click on a shipping zone or create a new one
-3. Add **Special Rate Shipping** method
-4. Configure package types and rates:
-   - **Small Box**: Default rate $6.35
-   - **Medium Box**: Default rate $9.35  
-   - **Big Box**: Default rate $13.35
+1. **Activate Plugin**: Go to **Plugins > Installed Plugins** and activate Special Rate Shipping
+2. **Configure USPS API** (optional): Navigate to **Settings > Special Rate Shipping**
+   ```
+   USPS Client ID: [Your USPS API Client ID]
+   USPS Client Secret: [Your USPS API Secret]
+   Environment: Sandbox (for testing) or Production
+   ```
+3. **Add Shipping Method**: Go to **WooCommerce > Settings > Shipping**
+   - Select a shipping zone or create new one
+   - Add **"Special Rate Shipping (Optimized)"** method
+   - Configure package rates and limits
 
-### Advanced Configuration
+### 2️⃣ **Package Configuration**
 
-#### Shipping Classes
+| Package Type | Default Rate | Max Weight | Dimensions (L×W×H) | Best For |
+|--------------|--------------|------------|-------------------|----------|
+| **Small Box** | $6.35 | 2.0 lbs | 8×6×4 inches | Small items, accessories |
+| **Medium Box** | $9.35 | 5.0 lbs | 12×8×6 inches | Standard products |
+| **Big Box** | $13.35 | 10.0 lbs | 16×12×8 inches | Large items, multiple products |
+| **Envelope** | $4.50 | 0.5 lbs | 12×9×1 inches | Documents, flat items |
+| **Flat Rate** | $8.45 | 70.0 lbs | 12×8×6 inches | Heavy items, bulk shipping |
 
-Configure how many items of each shipping class can fit in different package types:
+### 3️⃣ **Advanced Features**
 
-```php
-// Example: Electronics shipping class
-Small Box: Max 3 items
-Medium Box: Max 6 items  
-Big Box: Max 12 items
+#### 🧠 **Intelligent Optimization**
+The system automatically:
+- ✅ Analyzes product weights and dimensions
+- ✅ Groups items by shipping class
+- ✅ Tests all possible package combinations
+- ✅ Selects the most cost-effective solution
+- ✅ Provides real-time USPS rates (if configured)
+
+#### 📦 **Automated Pouch Creation**
+When customers complete orders:
+- ✅ Pouches are automatically created
+- ✅ Products are optimally distributed across packages
+- ✅ Barcodes are generated for tracking
+- ✅ Shipping addresses are parsed and validated
+- ✅ Integration with WooCommerce order management
+
+#### 🎨 **Professional Admin Interface**
+- ✅ Bootstrap-powered responsive design
+- ✅ Visual package breakdown with charts
+- ✅ Real-time optimization statistics
+- ✅ AJAX-powered smooth operations
+- ✅ Comprehensive error handling
+
+## ⚙️ **Configuration Options**
+
+### 🗺️ **USPS API Configuration**
+
+1. **Get USPS Credentials**: Register at [USPS Developer Portal](https://developer.usps.com)
+2. **Plugin Settings**: Navigate to **Settings > Special Rate Shipping > USPS API Configuration**
+3. **Configure**:
+   ```
+   API Key (Client ID): Your USPS application Client ID
+   API Secret: Your USPS application Client Secret  
+   Environment: 
+     • Sandbox (api-cat.usps.com) - for testing
+     • Production (api.usps.com) - for live transactions
+   Debug Mode: Enable for troubleshooting
+   ```
+
+### 🏢 **Sender Information**
+Configure your business address for shipping labels:
+```
+First Name: [Your first name]
+Last Name: [Your last name] 
+Company: [Your business name]
+Address: [Complete business address]
+City, State, ZIP: [Your location]
+Phone: [Business phone number]
+Email: [Contact email]
 ```
 
-The plugin automatically calculates the most cost-effective packaging solution.
+### 📦 **Shipping Class Configuration**
 
-#### Package Optimization Algorithm
+Customize package limits per shipping class:
 
-The plugin uses an intelligent algorithm that:
-1. Groups cart items by shipping class
-2. Calculates packaging requirements for each group
-3. Evaluates all possible package combinations
-4. Selects the most cost-effective solution
-5. Applies the total shipping cost
+```php
+// Example: Electronics Shipping Class
+Small Box: 3 items max, enabled
+Medium Box: 6 items max, enabled  
+Big Box: 12 items max, enabled
+Envelope: Disabled
+Flat Rate: 8 items max, enabled
+
+// Example: Fragile Items Shipping Class
+Small Box: 1 item max, enabled
+Medium Box: 2 items max, enabled
+Big Box: Disabled
+Envelope: Disabled  
+Flat Rate: 1 item max, enabled
+```
 
 ## 🛠 Development
 

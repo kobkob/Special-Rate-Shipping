@@ -1211,77 +1211,234 @@ class Special_Rate_Shipping {
 	 * @return  void
 	 */
 	public function admin_dashboard_page() {
+		// Enqueue Bootstrap CSS
+		wp_enqueue_style( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css', array(), '5.3.2' );
+		wp_enqueue_script( 'bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js', array(), '5.3.2', true );
+		
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Special Rate System Dashboard', 'special-rate-shipping' ); ?></h1>
-			
-			<div class="srs-dashboard-widgets">
-				<div class="srs-widget">
-					<h2><?php esc_html_e( 'Quick Actions', 'special-rate-shipping' ); ?></h2>
-					<p>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-create-pouch' ) ); ?>" class="button button-primary">
-							<?php esc_html_e( 'Create New Pouch', 'special-rate-shipping' ); ?>
-						</a>
-						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=pouch' ) ); ?>" class="button">
-							<?php esc_html_e( 'View All Pouches', 'special-rate-shipping' ); ?>
-						</a>
-					</p>
+			<div class="container-fluid">
+				<!-- Header Section -->
+				<div class="row mb-4">
+					<div class="col-12">
+						<div class="d-flex justify-content-between align-items-center">
+							<div>
+								<h1 class="mb-0">
+									<span class="dashicons dashicons-products me-2" style="font-size: 32px; vertical-align: middle;"></span>
+									<?php esc_html_e( 'Special Rate System Dashboard', 'special-rate-shipping' ); ?>
+								</h1>
+								<p class="text-muted mb-0"><?php esc_html_e( 'Intelligent package optimization and shipping management', 'special-rate-shipping' ); ?></p>
+							</div>
+							<div>
+								<span class="badge bg-success fs-6">v2.0</span>
+							</div>
+						</div>
+					</div>
 				</div>
-				
-				<div class="srs-widget">
-					<h2><?php esc_html_e( 'System Status', 'special-rate-shipping' ); ?></h2>
-					<?php
-					$pouch_count = wp_count_posts( 'pouch' );
-					$total_pouches = $pouch_count->publish + $pouch_count->draft + $pouch_count->pending;
 
-					// Get automatic vs manual pouches
-					$automatic_pouches = get_posts( array(
-						'post_type' => 'pouch',
-						'posts_per_page' => -1,
-						'post_status' => 'any',
-						'meta_query' => array(
-							array(
-								'key' => '_order_id',
-								'compare' => 'EXISTS'
-							)
-						),
-						'fields' => 'ids'
-					) );
-					$automatic_count = count( $automatic_pouches );
-					$manual_count = $total_pouches - $automatic_count;
+				<!-- Quick Actions Section -->
+				<div class="row mb-4">
+					<div class="col-12">
+						<div class="card border-0 shadow-sm">
+							<div class="card-header bg-primary text-white">
+								<h5 class="mb-0">
+									<i class="dashicons dashicons-controls-forward" style="vertical-align: middle;"></i>
+									<?php esc_html_e( 'Quick Actions', 'special-rate-shipping' ); ?>
+								</h5>
+							</div>
+							<div class="card-body">
+								<div class="row">
+									<div class="col-md-6 col-lg-3 mb-3">
+										<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-create-pouch' ) ); ?>" class="btn btn-success w-100 py-3">
+											<i class="dashicons dashicons-plus-alt2" style="font-size: 20px;"></i><br>
+											<?php esc_html_e( 'Create New Pouch', 'special-rate-shipping' ); ?>
+										</a>
+									</div>
+									<div class="col-md-6 col-lg-3 mb-3">
+										<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=pouch' ) ); ?>" class="btn btn-outline-primary w-100 py-3">
+											<i class="dashicons dashicons-archive" style="font-size: 20px;"></i><br>
+											<?php esc_html_e( 'View All Pouches', 'special-rate-shipping' ); ?>
+										</a>
+									</div>
+									<div class="col-md-6 col-lg-3 mb-3">
+										<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-settings' ) ); ?>" class="btn btn-outline-secondary w-100 py-3">
+											<i class="dashicons dashicons-admin-settings" style="font-size: 20px;"></i><br>
+											<?php esc_html_e( 'Settings', 'special-rate-shipping' ); ?>
+										</a>
+									</div>
+									<div class="col-md-6 col-lg-3 mb-3">
+										<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-docs' ) ); ?>" class="btn btn-outline-info w-100 py-3">
+											<i class="dashicons dashicons-book" style="font-size: 20px;"></i><br>
+											<?php esc_html_e( 'Documentation', 'special-rate-shipping' ); ?>
+										</a>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
 
-					// Get status counts
-					$status_counts = array(
-						'new' => 0,
-						'packed' => 0,
-						'shipped' => 0,
-						'delivered' => 0
-					);
+				<!-- Statistics Section -->
+				<div class="row mb-4">
+					<div class="col-12">
+						<div class="card border-0 shadow-sm">
+							<div class="card-header bg-info text-white">
+								<h5 class="mb-0">
+									<i class="dashicons dashicons-chart-area" style="vertical-align: middle;"></i>
+									<?php esc_html_e( 'System Statistics', 'special-rate-shipping' ); ?>
+								</h5>
+							</div>
+							<div class="card-body">
+							<?php
+							$pouch_count = wp_count_posts( 'pouch' );
+							$total_pouches = $pouch_count->publish + $pouch_count->draft + $pouch_count->pending;
 
-					if ( $total_pouches > 0 ) {
-						global $wpdb;
-						$results = $wpdb->get_results(
-							"SELECT meta_value, COUNT(*) as count FROM {$wpdb->postmeta} pm 
-							 JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
-							 WHERE pm.meta_key = '_pouch_status' AND p.post_type = 'pouch' AND p.post_status != 'trash'
-							 GROUP BY meta_value"
-						);
-						foreach ( $results as $result ) {
-							if ( isset( $status_counts[ $result->meta_value ] ) ) {
-								$status_counts[ $result->meta_value ] = $result->count;
+							// Get automatic vs manual pouches
+							$automatic_pouches = get_posts( array(
+								'post_type' => 'pouch',
+								'posts_per_page' => -1,
+								'post_status' => 'any',
+								'meta_query' => array(
+									array(
+										'key' => '_order_id',
+										'compare' => 'EXISTS'
+									)
+								),
+								'fields' => 'ids'
+							) );
+							$automatic_count = count( $automatic_pouches );
+							$manual_count = $total_pouches - $automatic_count;
+
+							// Get status counts
+							$status_counts = array(
+								'new' => 0,
+								'packed' => 0,
+								'shipped' => 0,
+								'delivered' => 0
+							);
+
+							if ( $total_pouches > 0 ) {
+								global $wpdb;
+								$results = $wpdb->get_results(
+									"SELECT meta_value, COUNT(*) as count FROM {$wpdb->postmeta} pm 
+									 JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
+									 WHERE pm.meta_key = '_pouch_status' AND p.post_type = 'pouch' AND p.post_status != 'trash'
+									 GROUP BY meta_value"
+								);
+								foreach ( $results as $result ) {
+									if ( isset( $status_counts[ $result->meta_value ] ) ) {
+										$status_counts[ $result->meta_value ] = $result->count;
+									}
+								}
 							}
-						}
-					}
-					?>
-					<p><strong><?php printf( esc_html__( 'Total Pouches: %d', 'special-rate-shipping' ), $total_pouches ); ?></strong></p>
-					<p><?php printf( esc_html__( 'Automatic: %d', 'special-rate-shipping' ), $automatic_count ); ?></p>
-					<p><?php printf( esc_html__( 'Manual: %d', 'special-rate-shipping' ), $manual_count ); ?></p>
-					<hr>
-					<p><strong><?php esc_html_e( 'By Status:', 'special-rate-shipping' ); ?></strong></p>
-					<p><?php printf( esc_html__( 'New: %d', 'special-rate-shipping' ), $status_counts['new'] ); ?></p>
-					<p><?php printf( esc_html__( 'Packed: %d', 'special-rate-shipping' ), $status_counts['packed'] ); ?></p>
-					<p><?php printf( esc_html__( 'Shipped: %d', 'special-rate-shipping' ), $status_counts['shipped'] ); ?></p>
-					<p><?php printf( esc_html__( 'Delivered: %d', 'special-rate-shipping' ), $status_counts['delivered'] ); ?></p>
+							?>
+
+							<!-- Statistics Cards -->
+							<div class="row g-3">
+								<!-- Total Pouches Card -->
+								<div class="col-md-6 col-xl-3">
+									<div class="card text-white bg-primary h-100">
+										<div class="card-body">
+											<div class="d-flex justify-content-between">
+												<div>
+													<h3 class="card-title mb-1"><?php echo esc_html( $total_pouches ); ?></h3>
+													<p class="card-text mb-0"><?php esc_html_e( 'Total Pouches', 'special-rate-shipping' ); ?></p>
+												</div>
+												<div class="align-self-start">
+													<i class="dashicons dashicons-archive" style="font-size: 2.5rem;"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Automatic Pouches Card -->
+								<div class="col-md-6 col-xl-3">
+									<div class="card text-white bg-success h-100">
+										<div class="card-body">
+											<div class="d-flex justify-content-between">
+												<div>
+													<h3 class="card-title mb-1"><?php echo esc_html( $automatic_count ); ?></h3>
+													<p class="card-text mb-0"><?php esc_html_e( 'Automatic Pouches', 'special-rate-shipping' ); ?></p>
+												</div>
+												<div class="align-self-start">
+													<i class="dashicons dashicons-update" style="font-size: 2.5rem;"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Manual Pouches Card -->
+								<div class="col-md-6 col-xl-3">
+									<div class="card text-white bg-warning h-100">
+										<div class="card-body">
+											<div class="d-flex justify-content-between">
+												<div>
+													<h3 class="card-title mb-1"><?php echo esc_html( $manual_count ); ?></h3>
+													<p class="card-text mb-0"><?php esc_html_e( 'Manual Pouches', 'special-rate-shipping' ); ?></p>
+												</div>
+												<div class="align-self-start">
+													<i class="dashicons dashicons-edit" style="font-size: 2.5rem;"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Package Optimization Card -->
+								<div class="col-md-6 col-xl-3">
+									<div class="card text-white bg-info h-100">
+										<div class="card-body">
+											<div class="d-flex justify-content-between">
+												<div>
+													<h3 class="card-title mb-1">v2.0</h3>
+													<p class="card-text mb-0"><?php esc_html_e( 'Optimization Engine', 'special-rate-shipping' ); ?></p>
+												</div>
+												<div class="align-self-start">
+													<i class="dashicons dashicons-chart-line" style="font-size: 2.5rem;"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Status Breakdown -->
+							<div class="row mt-4">
+								<div class="col-12">
+									<h6 class="mb-3"><?php esc_html_e( 'Pouch Status Breakdown', 'special-rate-shipping' ); ?></h6>
+									<div class="row g-2">
+										<div class="col-sm-6 col-lg-3">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-secondary me-2"><?php echo esc_html( $status_counts['new'] ); ?></span>
+												<span><?php esc_html_e( 'New', 'special-rate-shipping' ); ?></span>
+											</div>
+										</div>
+										<div class="col-sm-6 col-lg-3">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-info me-2"><?php echo esc_html( $status_counts['packed'] ); ?></span>
+												<span><?php esc_html_e( 'Packed', 'special-rate-shipping' ); ?></span>
+											</div>
+										</div>
+										<div class="col-sm-6 col-lg-3">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-warning me-2"><?php echo esc_html( $status_counts['shipped'] ); ?></span>
+												<span><?php esc_html_e( 'Shipped', 'special-rate-shipping' ); ?></span>
+											</div>
+										</div>
+										<div class="col-sm-6 col-lg-3">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-success me-2"><?php echo esc_html( $status_counts['delivered'] ); ?></span>
+												<span><?php esc_html_e( 'Delivered', 'special-rate-shipping' ); ?></span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 			
@@ -1331,97 +1488,221 @@ class Special_Rate_Shipping {
 			'order' => 'ASC'
 		) );
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Create New Pouch', 'special-rate-shipping' ); ?></h1>
-			
-			<form method="post" action="" class="srs-create-pouch-form">
-				<?php wp_nonce_field( 'create_pouch_action', 'pouch_nonce' ); ?>
-				
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="pouch_title"><?php esc_html_e( 'Pouch Title', 'special-rate-shipping' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="pouch_title" name="pouch_title" class="regular-text" required>
-							<p class="description"><?php esc_html_e( 'Enter a descriptive title for this pouch', 'special-rate-shipping' ); ?></p>
-						</td>
-					</tr>
-					
-					<tr>
-						<th scope="row">
-							<label for="pouch_products"><?php esc_html_e( 'Products', 'special-rate-shipping' ); ?></label>
-						</th>
-						<td>
-							<select id="pouch_products" name="pouch_products[]" multiple class="srs-products-select" style="width: 100%; min-height: 150px;">
-								<?php foreach ( $products as $product ) : ?>
-									<option value="<?php echo esc_attr( $product->get_id() ); ?>">
-										<?php echo esc_html( $product->get_name() . ' - $' . $product->get_price() ); ?>
-									</option>
-								<?php endforeach; ?>
-							</select>
-							<p class="description"><?php esc_html_e( 'Select products to include in this pouch. Hold Ctrl/Cmd to select multiple.', 'special-rate-shipping' ); ?></p>
-						</td>
-					</tr>
-					
-					<tr>
-						<th scope="row">
-							<label for="package_type"><?php esc_html_e( 'USPS Package Type', 'special-rate-shipping' ); ?></label>
-						</th>
-						<td>
-							<select id="package_type" name="package_type" class="regular-text" required>
-								<option value=""><?php esc_html_e( 'Select Package Type', 'special-rate-shipping' ); ?></option>
-								<option value="small_box"><?php esc_html_e( 'Small Box', 'special-rate-shipping' ); ?></option>
-								<option value="medium_box"><?php esc_html_e( 'Medium Box', 'special-rate-shipping' ); ?></option>
-								<option value="big_box"><?php esc_html_e( 'Big Box', 'special-rate-shipping' ); ?></option>
-								<option value="envelope"><?php esc_html_e( 'Envelope', 'special-rate-shipping' ); ?></option>
-								<option value="flat_rate"><?php esc_html_e( 'Flat Rate Box', 'special-rate-shipping' ); ?></option>
-							</select>
-							<p class="description"><?php esc_html_e( 'Select the USPS package type for shipping', 'special-rate-shipping' ); ?></p>
-						</td>
-					</tr>
-					
-					<tr>
-						<th scope="row">
-							<label for="recipient_info"><?php esc_html_e( 'Recipient Information', 'special-rate-shipping' ); ?></label>
-						</th>
-						<td>
-							<textarea id="recipient_info" name="recipient_info" class="large-text" rows="4" placeholder="Name
-Address Line 1
-Address Line 2
-City, State ZIP"></textarea>
-							<p class="description"><?php esc_html_e( 'Enter recipient shipping address (optional for draft pouches)', 'special-rate-shipping' ); ?></p>
-						</td>
-					</tr>
-					
-					<tr>
-						<th scope="row">
-							<label for="pouch_notes"><?php esc_html_e( 'Notes', 'special-rate-shipping' ); ?></label>
-						</th>
-						<td>
-							<textarea id="pouch_notes" name="pouch_notes" class="large-text" rows="3"></textarea>
-							<p class="description"><?php esc_html_e( 'Optional notes about this pouch', 'special-rate-shipping' ); ?></p>
-						</td>
-					</tr>
-				</table>
-				
-				<p class="submit">
-					<input type="submit" name="create_pouch" class="button button-primary" value="<?php esc_attr_e( 'Create Pouch', 'special-rate-shipping' ); ?>">
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-system' ) ); ?>" class="button"><?php esc_html_e( 'Cancel', 'special-rate-shipping' ); ?></a>
-				</p>
-			</form>
-			
-			<style>
-			.srs-create-pouch-form .form-table th {
-				width: 200px;
-				vertical-align: top;
-				padding-top: 15px;
-			}
-			.srs-products-select {
-				max-width: 500px;
-			}
-			</style>
-		</div>
+			<!-- Bootstrap CDN -->
+			<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+			<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+			<div class="wrap">
+				<div class="container-fluid">
+					<div class="row">
+						<div class="col-12">
+							<h1 class="mb-4">
+								<i class="dashicons dashicons-plus-alt" style="vertical-align: text-top;"></i>
+								<?php esc_html_e( 'Create New Pouch', 'special-rate-shipping' ); ?>
+							</h1>
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-lg-8">
+							<div class="card">
+								<div class="card-header bg-primary text-white">
+									<h5 class="mb-0">
+										<i class="dashicons dashicons-archive" style="vertical-align: text-top;"></i>
+										<?php esc_html_e( 'Pouch Configuration', 'special-rate-shipping' ); ?>
+									</h5>
+								</div>
+								<div class="card-body">
+									<form method="post" action="" class="srs-create-pouch-form">
+										<?php wp_nonce_field( 'create_pouch_action', 'pouch_nonce' ); ?>
+										
+										<div class="row mb-4">
+											<div class="col-12">
+												<div class="mb-3">
+													<label for="pouch_title" class="form-label fw-bold">
+														<i class="dashicons dashicons-tag" style="vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Pouch Title', 'special-rate-shipping' ); ?>
+													</label>
+													<input type="text" id="pouch_title" name="pouch_title" class="form-control" required>
+													<div class="form-text"><?php esc_html_e( 'Enter a descriptive title for this pouch', 'special-rate-shipping' ); ?></div>
+												</div>
+											</div>
+										</div>
+
+										<div class="row mb-4">
+											<div class="col-12">
+												<div class="mb-3">
+													<label for="pouch_products" class="form-label fw-bold">
+														<i class="dashicons dashicons-products" style="vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Products', 'special-rate-shipping' ); ?>
+													</label>
+													<select id="pouch_products" name="pouch_products[]" multiple class="form-select" style="min-height: 150px;">
+														<?php foreach ( $products as $product ) : ?>
+															<option value="<?php echo esc_attr( $product->get_id() ); ?>">
+																<?php echo esc_html( $product->get_name() . ' - $' . $product->get_price() ); ?>
+															</option>
+														<?php endforeach; ?>
+													</select>
+													<div class="form-text"><?php esc_html_e( 'Select products to include in this pouch. Hold Ctrl/Cmd to select multiple.', 'special-rate-shipping' ); ?></div>
+												</div>
+											</div>
+										</div>
+
+										<div class="row mb-4">
+											<div class="col-12">
+												<div class="mb-3">
+													<label for="package_type" class="form-label fw-bold">
+														<i class="dashicons dashicons-building" style="vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Package Optimization', 'special-rate-shipping' ); ?>
+													</label>
+													<select id="package_type" name="package_type" class="form-select" required>
+														<option value="auto"><?php esc_html_e( 'Auto-Optimize (Recommended)', 'special-rate-shipping' ); ?></option>
+														<option value="small_box"><?php esc_html_e( 'Force Small Box', 'special-rate-shipping' ); ?></option>
+														<option value="medium_box"><?php esc_html_e( 'Force Medium Box', 'special-rate-shipping' ); ?></option>
+														<option value="big_box"><?php esc_html_e( 'Force Big Box', 'special-rate-shipping' ); ?></option>
+														<option value="envelope"><?php esc_html_e( 'Force Envelope', 'special-rate-shipping' ); ?></option>
+														<option value="flat_rate"><?php esc_html_e( 'Force Flat Rate Box', 'special-rate-shipping' ); ?></option>
+													</select>
+													<div class="form-text"><?php esc_html_e( 'Choose auto-optimize for best shipping cost, or select a specific package type', 'special-rate-shipping' ); ?></div>
+												</div>
+											</div>
+										</div>
+
+										<div class="row mb-4">
+											<div class="col-12">
+												<div class="mb-3">
+													<label for="recipient_info" class="form-label fw-bold">
+														<i class="dashicons dashicons-location-alt" style="vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Recipient Information', 'special-rate-shipping' ); ?>
+													</label>
+													<textarea id="recipient_info" name="recipient_info" class="form-control" rows="4" 
+															  placeholder="Name&#10;Address Line 1&#10;Address Line 2&#10;City, State ZIP"></textarea>
+													<div class="form-text"><?php esc_html_e( 'Enter recipient shipping address (optional for draft pouches)', 'special-rate-shipping' ); ?></div>
+												</div>
+											</div>
+										</div>
+
+										<div class="row mb-4">
+											<div class="col-12">
+												<div class="mb-3">
+													<label for="pouch_notes" class="form-label fw-bold">
+														<i class="dashicons dashicons-sticky" style="vertical-align: text-top;"></i>
+														<?php esc_html_e( 'Notes', 'special-rate-shipping' ); ?>
+													</label>
+													<textarea id="pouch_notes" name="pouch_notes" class="form-control" rows="3"></textarea>
+													<div class="form-text"><?php esc_html_e( 'Optional notes about this pouch', 'special-rate-shipping' ); ?></div>
+												</div>
+											</div>
+										</div>
+										
+										<div class="d-grid gap-2 d-md-flex justify-content-md-end">
+											<a href="<?php echo esc_url( admin_url( 'admin.php?page=special-rate-system' ) ); ?>" class="btn btn-outline-secondary me-md-2">
+												<i class="dashicons dashicons-arrow-left-alt" style="font-size: 14px; vertical-align: text-top;"></i>
+												<?php esc_html_e( 'Cancel', 'special-rate-shipping' ); ?>
+											</a>
+											<button type="submit" name="create_pouch" class="btn btn-primary btn-lg">
+												<i class="dashicons dashicons-yes-alt" style="font-size: 18px; vertical-align: text-top;"></i>
+												<?php esc_html_e( 'Create Optimized Pouch', 'special-rate-shipping' ); ?>
+											</button>
+										</div>
+									</form>
+								</div>
+							</div>
+						</div>
+
+						<!-- Info Panel -->
+						<div class="col-lg-4">
+							<div class="card mb-4">
+								<div class="card-header bg-success text-white">
+									<h6 class="mb-0">
+										<i class="dashicons dashicons-chart-line" style="vertical-align: text-top;"></i>
+										<?php esc_html_e( 'Package Optimization Engine', 'special-rate-shipping' ); ?>
+									</h6>
+								</div>
+								<div class="card-body">
+									<p class="small text-muted mb-3">
+										<?php esc_html_e( 'Our optimization engine automatically selects the most cost-effective packaging combination from these USPS options:', 'special-rate-shipping' ); ?>
+									</p>
+									<div class="list-group list-group-flush">
+										<div class="list-group-item px-0 py-2 border-0">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-primary me-2">S</span>
+												<div>
+													<small class="fw-bold d-block">Small Box</small>
+													<small class="text-muted">8.5×5.5×1.6 in, up to 4 lbs</small>
+												</div>
+											</div>
+										</div>
+										<div class="list-group-item px-0 py-2 border-0">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-info me-2">M</span>
+												<div>
+													<small class="fw-bold d-block">Medium Box</small>
+													<small class="text-muted">11×8.5×5.5 in, up to 20 lbs</small>
+												</div>
+											</div>
+										</div>
+										<div class="list-group-item px-0 py-2 border-0">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-warning me-2">L</span>
+												<div>
+													<small class="fw-bold d-block">Large Box</small>
+													<small class="text-muted">12×12×5.5 in, up to 70 lbs</small>
+												</div>
+											</div>
+										</div>
+										<div class="list-group-item px-0 py-2 border-0">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-secondary me-2">E</span>
+												<div>
+													<small class="fw-bold d-block">Envelope</small>
+													<small class="text-muted">12.5×9.5×0.75 in, up to 4 lbs</small>
+												</div>
+											</div>
+										</div>
+										<div class="list-group-item px-0 py-2 border-0">
+											<div class="d-flex align-items-center">
+												<span class="badge bg-danger me-2">F</span>
+												<div>
+													<small class="fw-bold d-block">Flat Rate</small>
+													<small class="text-muted">12×12×8 in, up to 70 lbs</small>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="card">
+								<div class="card-header bg-info text-white">
+									<h6 class="mb-0">
+										<i class="dashicons dashicons-lightbulb" style="vertical-align: text-top;"></i>
+										<?php esc_html_e( 'Smart Features', 'special-rate-shipping' ); ?>
+									</h6>
+								</div>
+								<div class="card-body">
+									<div class="mb-2">
+										<i class="dashicons dashicons-yes-alt text-success" style="font-size: 14px;"></i>
+										<small><?php esc_html_e( 'Multi-package optimization', 'special-rate-shipping' ); ?></small>
+									</div>
+									<div class="mb-2">
+										<i class="dashicons dashicons-yes-alt text-success" style="font-size: 14px;"></i>
+										<small><?php esc_html_e( 'Weight & dimension analysis', 'special-rate-shipping' ); ?></small>
+									</div>
+									<div class="mb-2">
+										<i class="dashicons dashicons-yes-alt text-success" style="font-size: 14px;"></i>
+										<small><?php esc_html_e( 'Cost minimization', 'special-rate-shipping' ); ?></small>
+									</div>
+									<div class="mb-0">
+										<i class="dashicons dashicons-yes-alt text-success" style="font-size: 14px;"></i>
+										<small><?php esc_html_e( 'USPS label generation', 'special-rate-shipping' ); ?></small>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		<?php
 	} // End admin_create_pouch_page ()
 
