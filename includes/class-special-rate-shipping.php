@@ -405,7 +405,9 @@ class Special_Rate_Shipping {
 			<?php
 		endif;
 
-		<!-- Product Details Table -->
+		if ( ! empty( $display_products ) && is_array( $display_products ) ) :
+			?>
+			<!-- Product Details Table -->
 		<div class="table-responsive">
 			<table class="table table-striped table-hover">
 				<thead class="table-light">
@@ -522,7 +524,7 @@ class Special_Rate_Shipping {
 				</tbody>
 			</table>
 		</div>
-			<?php
+		<?php
 		else :
 			?>
 			<div class="alert alert-info">
