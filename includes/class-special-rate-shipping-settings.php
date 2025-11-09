@@ -274,7 +274,14 @@ class Special_Rate_Shipping_Settings {
 				array(
 					'id' 			=> 'enable_package_optimization',
 					'label'			=> __( 'Enable Package Optimization', 'special-rate-shipping' ),
-					'description'	=> __( 'Automatically optimize packaging to find the most cost-effective shipping solution.', 'special-rate-shipping' ),
+					'description'	=> __( 'Automatically optimize packaging to find the most cost-effective shipping solution using the new Package Optimizer engine.', 'special-rate-shipping' ),
+					'type'			=> 'checkbox',
+					'default'		=> 'on'
+				),
+				array(
+					'id' 			=> 'use_optimized_shipping_method',
+					'label'			=> __( 'Use Optimized Shipping Method', 'special-rate-shipping' ),
+					'description'	=> __( 'Enable the new centralized Optimized Special Rate Shipping method for better performance and cleaner configuration.', 'special-rate-shipping' ),
 					'type'			=> 'checkbox',
 					'default'		=> 'on'
 				)

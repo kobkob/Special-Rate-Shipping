@@ -127,8 +127,14 @@ class Special_Rate_Shipping {
 			$this->admin = new Special_Rate_Shipping_Admin_API();
 		}
 
-		// Load USPS API integration
+		// Load USPS API integration and Package Optimizer
 		require_once( dirname( __FILE__ ) . '/class-usps-api.php' );
+		require_once( dirname( __FILE__ ) . '/class-package-optimizer.php' );
+		require_once( dirname( __FILE__ ) . '/class-optimized-shipping-method.php' );
+		
+		// Register optimized shipping method
+		add_action( 'woocommerce_shipping_init', array( $this, 'init_optimized_shipping_method' ) );
+		add_filter( 'woocommerce_shipping_methods', array( $this, 'add_optimized_shipping_method' ) );
 		
 		// Add label generation handlers
 		add_action( 'admin_post_print_pouch_label', array( $this, 'handle_print_pouch_label' ) );
@@ -278,6 +284,8 @@ class Special_Rate_Shipping {
 	public function pouch_products_meta_box( $post ) {
 		$product_ids = get_post_meta( $post->ID, '_pouch_products', true ) ?: array();
 		$package_type = get_post_meta( $post->ID, '_package_type', true );
+		$optimization_result = get_post_meta( $post->ID, '_optimization_result', true );
+		$calculated_cost = get_post_meta( $post->ID, '_calculated_shipping_cost', true );
 
 		// Display summary information
 		if ( ! empty( $product_ids ) && is_array( $product_ids ) ) :
@@ -293,15 +301,44 @@ class Special_Rate_Shipping {
 			?>
 			<div class="pouch-summary" style="background: #f0f6fc; padding: 15px; margin-bottom: 20px; border: 1px solid #c3d4e5; border-radius: 5px;">
 				<h4 style="margin: 0 0 10px 0; color: #1d2327;"><?php esc_html_e( 'Packaging Summary', 'special-rate-shipping' ); ?></h4>
-				<div style="display: flex; gap: 20px; align-items: center;">
+				<div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
 					<div>
+						<span class="dashicons dashicons-products" style="color: #2271b1;"></span>
 						<strong><?php printf( esc_html__( '%d Products', 'special-rate-shipping' ), $product_count ); ?></strong>
 					</div>
 					<div>
 						<span class="dashicons dashicons-archive" style="color: #2271b1;"></span>
 						<strong><?php echo esc_html( $package_label ); ?></strong>
 					</div>
+					<?php if ( $optimization_result && is_array( $optimization_result ) ) : ?>
+						<div>
+							<span class="dashicons dashicons-chart-line" style="color: #2271b1;"></span>
+							<strong><?php printf( esc_html__( '%d Packages', 'special-rate-shipping' ), $optimization_result['total_packages'] ?? 1 ); ?></strong>
+						</div>
+						<?php if ( $calculated_cost > 0 ) : ?>
+							<div>
+								<span class="dashicons dashicons-money-alt" style="color: #2271b1;"></span>
+								<strong><?php printf( esc_html__( '$%.2f Cost', 'special-rate-shipping' ), $calculated_cost ); ?></strong>
+							</div>
+						<?php endif; ?>
+					<?php endif; ?>
 				</div>
+				
+				<?php if ( $optimization_result && is_array( $optimization_result ) && ! empty( $optimization_result['packages'] ) ) : ?>
+					<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #c3d4e5;">
+						<h5 style="margin: 0 0 8px 0; color: #1d2327; font-size: 13px;"><?php esc_html_e( 'Optimized Package Breakdown:', 'special-rate-shipping' ); ?></h5>
+						<div style="display: flex; gap: 15px; flex-wrap: wrap;">
+							<?php foreach ( $optimization_result['packages'] as $package ) : ?>
+								<div style="background: #fff; padding: 8px 12px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;">
+									<strong><?php echo esc_html( $package['name'] ?? $package['type'] ); ?></strong><br>
+									<span style="color: #646970;">
+										<?php printf( esc_html__( '%d items, %.1f lbs', 'special-rate-shipping' ), $package['items_count'] ?? 0, $package['weight'] ?? 0 ); ?>
+									</span>
+								</div>
+							<?php endforeach; ?>
+						</div>
+					</div>
+				<?php endif; ?>
 			</div>
 			<?php
 		endif;
@@ -701,19 +738,38 @@ class Special_Rate_Shipping {
 			return; // Pouch already exists
 		}
 
-		// Get order items (products)
-		$product_ids = array();
+		// Get order items (products) with quantities
+		$items = array();
 		foreach ( $order->get_items() as $item ) {
-			$product_ids[] = $item->get_product_id();
+			$items[] = array(
+				'product_id' => $item->get_product_id(),
+				'quantity' => $item->get_quantity()
+			);
 		}
 
 		// Get shipping address
 		$shipping_address = $this->format_shipping_address( $order );
+		$recipient_address = $this->parse_recipient_info( $shipping_address );
+
+		// Initialize Package Optimizer
+		$use_usps_rates = get_option( 'srs_enable_package_optimization', 'on' ) === 'on';
+		$optimizer = new Package_Optimizer( $use_usps_rates );
+
+		// Calculate optimal packaging
+		$optimization_result = $optimizer->generate_pouch_configuration( $items, $recipient_address );
 
 		// Create the pouch
 		$pouch_title = sprintf(
 			__( 'Order #%s Pouch', 'special-rate-shipping' ),
 			$order->get_order_number()
+		);
+
+		$product_ids = array_column( $items, 'product_id' );
+		$optimization_notes = sprintf(
+			__( 'Auto-optimized: %d packages, $%.2f total cost. Primary package: %s', 'special-rate-shipping' ),
+			$optimization_result['total_packages'],
+			$optimization_result['total_cost'],
+			$optimization_result['package_type']
 		);
 
 		$pouch_data = array(
@@ -723,15 +779,17 @@ class Special_Rate_Shipping {
 			'post_type' => 'pouch',
 			'meta_input' => array(
 				'_pouch_products' => $product_ids,
-				'_package_type' => $selected_package_type,
+				'_package_type' => $optimization_result['package_type'],
 				'_recipient_info' => $shipping_address,
-				'_pouch_notes' => sprintf( __( 'Auto-generated from WooCommerce Order #%s', 'special-rate-shipping' ), $order->get_order_number() ),
+				'_pouch_notes' => $optimization_notes,
 				'_pouch_status' => 'new',
 				'_created_date' => current_time( 'mysql' ),
 				'_barcode' => $this->generate_barcode(),
 				'_order_id' => $order_id,
 				'_order_total' => $order->get_total(),
-				'_customer_id' => $order->get_customer_id()
+				'_customer_id' => $order->get_customer_id(),
+				'_optimization_result' => $optimization_result,
+				'_calculated_shipping_cost' => $optimization_result['total_cost']
 			)
 		);
 
@@ -2046,5 +2104,27 @@ City, State ZIP"></textarea>
 		echo '</body></html>';
 		exit;
 	} // End handle_print_pouch_label ()
+
+	/**
+	 * Initialize optimized shipping method
+	 * @access  public
+	 * @since   2.0.0
+	 * @return  void
+	 */
+	public function init_optimized_shipping_method() {
+		// Class is already loaded via require_once above
+	} // End init_optimized_shipping_method ()
+
+	/**
+	 * Add optimized shipping method to WooCommerce
+	 * @access  public
+	 * @since   2.0.0
+	 * @param   array $methods
+	 * @return  array
+	 */
+	public function add_optimized_shipping_method( $methods ) {
+		$methods['optimized_special_rate'] = 'Optimized_Shipping_Method';
+		return $methods;
+	} // End add_optimized_shipping_method ()
 
 }
