@@ -139,6 +139,7 @@ class Special_Rate_Shipping {
 		// Add label generation handlers
 		add_action( 'admin_post_print_pouch_label', array( $this, 'handle_print_pouch_label' ) );
 		add_action( 'admin_post_generate_usps_label', array( $this, 'handle_generate_usps_label' ) );
+		add_action( 'admin_post_recalculate_pouch_optimization', array( $this, 'handle_recalculate_optimization' ) );
 
 		// Handle localisation
 		$this->load_plugin_textdomain();
@@ -309,19 +310,33 @@ class Special_Rate_Shipping {
 			);
 			$package_label = isset( $package_types[ $package_type ] ) ? $package_types[ $package_type ] : __( 'Not specified', 'special-rate-shipping' );
 			
-			// Calculate totals if not stored
-			if ( $has_detailed_data && ( $total_items == 0 || $total_weight == 0 ) ) {
+			// Always recalculate totals from detailed data if available
+			if ( $has_detailed_data ) {
 				$total_items = 0;
 				$total_weight = 0;
 				$total_value = 0;
 				foreach ( $products_data as $item ) {
 					$product = wc_get_product( $item['product_id'] );
 					if ( $product ) {
-						$quantity = $item['quantity'] ?: 1;
-						$weight = $item['weight'] ?: $product->get_weight() ?: 0;
+						$quantity = isset( $item['quantity'] ) ? intval( $item['quantity'] ) : 1;
+						$unit_weight = isset( $item['weight'] ) ? floatval( $item['weight'] ) : $product->get_weight();
+						$unit_weight = $unit_weight ?: 0; // Fallback to 0 if weight is still empty
+						
 						$total_items += $quantity;
-						$total_weight += $weight * $quantity;
+						$total_weight += $unit_weight * $quantity;
 						$total_value += $product->get_price() * $quantity;
+					}
+				}
+			} elseif ( ! empty( $product_ids ) && is_array( $product_ids ) ) {
+				// Fallback calculation for legacy data
+				$total_items = count( $product_ids );
+				$total_weight = 0;
+				$total_value = 0;
+				foreach ( $product_ids as $product_id ) {
+					$product = wc_get_product( $product_id );
+					if ( $product ) {
+						$total_weight += $product->get_weight() ?: 0;
+						$total_value += $product->get_price();
 					}
 				}
 			}
@@ -571,8 +586,13 @@ class Special_Rate_Shipping {
 	 */
 	public function pouch_shipping_meta_box( $post ) {
 		$package_type = get_post_meta( $post->ID, '_package_type', true );
+		$optimization_result = get_post_meta( $post->ID, '_optimization_result', true );
+		$calculated_cost = get_post_meta( $post->ID, '_calculated_shipping_cost', true );
+		$products_data = get_post_meta( $post->ID, '_pouch_products_data', true ) ?: array();
 
 		$package_types = array(
+			'auto' => __( 'Auto-Optimize', 'special-rate-shipping' ),
+			'optimized' => __( 'Optimized Mix', 'special-rate-shipping' ),
 			'small_box' => __( 'Small Box', 'special-rate-shipping' ),
 			'medium_box' => __( 'Medium Box', 'special-rate-shipping' ),
 			'big_box' => __( 'Big Box', 'special-rate-shipping' ),
@@ -580,8 +600,8 @@ class Special_Rate_Shipping {
 			'flat_rate' => __( 'Flat Rate Box', 'special-rate-shipping' )
 		);
 		?>
-		<p>
-			<label for="package_type"><strong><?php esc_html_e( 'Package Type', 'special-rate-shipping' ); ?></strong></label><br>
+		<div style="margin-bottom: 15px;">
+			<label for="package_type"><strong><?php esc_html_e( 'Package Strategy', 'special-rate-shipping' ); ?></strong></label><br>
 			<select name="package_type" id="package_type" class="widefat">
 				<option value=""><?php esc_html_e( 'Select Package Type', 'special-rate-shipping' ); ?></option>
 				<?php foreach ( $package_types as $value => $label ) : ?>
@@ -590,7 +610,95 @@ class Special_Rate_Shipping {
 					</option>
 				<?php endforeach; ?>
 			</select>
-		</p>
+		</div>
+
+		<?php if ( $optimization_result && is_array( $optimization_result ) && ! empty( $optimization_result['packages'] ) ) : ?>
+			<div style="background: #f0f6fc; padding: 10px; border: 1px solid #c3d4e5; border-radius: 4px; margin-bottom: 15px;">
+				<h4 style="margin: 0 0 10px 0; font-size: 13px; color: #1d2327;"><?php esc_html_e( 'Package Requirements:', 'special-rate-shipping' ); ?></h4>
+				<?php 
+				$package_counts = array();
+				foreach ( $optimization_result['packages'] as $package ) {
+					$type = $package['type'] ?? 'unknown';
+					if ( ! isset( $package_counts[ $type ] ) ) {
+						$package_counts[ $type ] = 0;
+					}
+					$package_counts[ $type ]++;
+				}
+				
+				foreach ( $package_counts as $type => $count ) :
+					$type_name = isset( $package_types[ $type ] ) ? $package_types[ $type ] : ucfirst( str_replace( '_', ' ', $type ) );
+					?>
+					<div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #ddd;">
+						<span><strong><?php echo esc_html( $type_name ); ?></strong></span>
+						<span style="background: #2271b1; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+							<?php printf( esc_html__( '%d needed', 'special-rate-shipping' ), $count ); ?>
+						</span>
+					</div>
+					<?php
+				endforeach;
+				?>
+				
+				<?php if ( $calculated_cost > 0 ) : ?>
+					<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #c3d4e5;">
+						<strong><?php esc_html_e( 'Total Shipping Cost:', 'special-rate-shipping' ); ?></strong>
+						<span style="color: #00a32a; font-size: 16px; font-weight: bold;">
+							<?php echo wp_kses_post( wc_price( $calculated_cost ) ); ?>
+						</span>
+					</div>
+				<?php endif; ?>
+			</div>
+		<?php else : ?>
+			<div style="background: #fff3cd; padding: 10px; border: 1px solid #ffeaa7; border-radius: 4px; margin-bottom: 15px;">
+				<small style="color: #856404;">
+					<strong><?php esc_html_e( 'Note:', 'special-rate-shipping' ); ?></strong>
+					<?php esc_html_e( 'Package optimization not available. Add products and quantities to calculate optimal packaging.', 'special-rate-shipping' ); ?>
+				</small>
+			</div>
+		<?php endif; ?>
+		
+		<!-- Recalculation Button -->
+		<?php if ( ! empty( $products_data ) ) : ?>
+			<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+				<button type="button" class="button button-secondary" onclick="recalculateOptimization(<?php echo esc_js( $post->ID ); ?>)" id="recalculate-btn">
+					<span class="dashicons dashicons-update" style="vertical-align: middle;"></span>
+					<?php esc_html_e( 'Recalculate Package Optimization', 'special-rate-shipping' ); ?>
+				</button>
+				<p><small style="color: #666;"><?php esc_html_e( 'Click to recalculate optimal packaging based on current products and quantities.', 'special-rate-shipping' ); ?></small></p>
+			</div>
+			
+			<script>
+			function recalculateOptimization(pouchId) {
+				const button = document.getElementById('recalculate-btn');
+				const originalText = button.innerHTML;
+				
+				button.innerHTML = '<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; vertical-align: middle;"></span> <?php esc_html_e( 'Calculating...', 'special-rate-shipping' ); ?>';
+				button.disabled = true;
+				
+				fetch('<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+					},
+					body: 'action=recalculate_pouch_optimization&pouch_id=' + pouchId + '&_wpnonce=<?php echo wp_create_nonce( 'recalculate_optimization_' . $post->ID ); ?>'
+				})
+				.then(response => response.json())
+				.then(data => {
+					if (data.success) {
+						location.reload(); // Reload to show updated optimization
+					} else {
+						alert('<?php esc_html_e( 'Error:', 'special-rate-shipping' ); ?> ' + (data.data || '<?php esc_html_e( 'Could not recalculate optimization', 'special-rate-shipping' ); ?>'));
+						button.innerHTML = originalText;
+						button.disabled = false;
+					}
+				})
+				.catch(error => {
+					alert('<?php esc_html_e( 'Network error occurred', 'special-rate-shipping' ); ?>');
+					button.innerHTML = originalText;
+					button.disabled = false;
+				});
+			}
+			</script>
+		<?php endif; ?>
 		<?php
 	} // End pouch_shipping_meta_box ()
 
@@ -2790,5 +2898,103 @@ class Special_Rate_Shipping {
 		$methods['optimized_special_rate'] = 'Optimized_Shipping_Method';
 		return $methods;
 	} // End add_optimized_shipping_method ()
+
+	/**
+	 * Handle recalculate optimization AJAX request
+	 * @access  public
+	 * @since   2.0.0
+	 * @return  void
+	 */
+	public function handle_recalculate_optimization() {
+		// Check permissions and nonce
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( json_encode( array( 'success' => false, 'data' => 'Permission denied' ) ) );
+		}
+		
+		if ( ! isset( $_POST['pouch_id'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'recalculate_optimization_' . $_POST['pouch_id'] ) ) {
+			wp_die( json_encode( array( 'success' => false, 'data' => 'Invalid request' ) ) );
+		}
+		
+		$pouch_id = intval( $_POST['pouch_id'] );
+		$pouch = get_post( $pouch_id );
+		
+		if ( ! $pouch || $pouch->post_type !== 'pouch' ) {
+			wp_die( json_encode( array( 'success' => false, 'data' => 'Invalid pouch' ) ) );
+		}
+		
+		// Get products data
+		$products_data = get_post_meta( $pouch_id, '_pouch_products_data', true );
+		
+		if ( empty( $products_data ) || ! is_array( $products_data ) ) {
+			wp_die( json_encode( array( 'success' => false, 'data' => 'No product data available for optimization' ) ) );
+		}
+		
+		// Calculate totals
+		$total_weight = 0;
+		$total_value = 0;
+		$total_items = 0;
+		
+		foreach ( $products_data as $item ) {
+			$product = wc_get_product( $item['product_id'] );
+			if ( $product ) {
+				$quantity = isset( $item['quantity'] ) ? intval( $item['quantity'] ) : 1;
+				$weight = isset( $item['weight'] ) ? floatval( $item['weight'] ) : $product->get_weight();
+				$weight = $weight ?: 0;
+				
+				$total_items += $quantity;
+				$total_weight += $weight * $quantity;
+				$total_value += $product->get_price() * $quantity;
+			}
+		}
+		
+		// Run optimization if Package Optimizer exists
+		$optimization_result = null;
+		$calculated_cost = 0;
+		
+		if ( class_exists( 'Package_Optimizer' ) ) {
+			try {
+				$optimizer = new Package_Optimizer();
+				$optimization_result = $optimizer->optimize_packages( $products_data, array(
+					'weight' => $total_weight,
+					'value' => $total_value,
+					'items' => $total_items
+				) );
+				
+				if ( $optimization_result && isset( $optimization_result['total_cost'] ) ) {
+					$calculated_cost = $optimization_result['total_cost'];
+				}
+			} catch ( Exception $e ) {
+				error_log( 'Package optimization failed during recalculation: ' . $e->getMessage() );
+				$optimization_result = array(
+					'error' => true,
+					'message' => 'Optimization failed: ' . $e->getMessage()
+				);
+			}
+		}
+		
+		// Update pouch meta data
+		update_post_meta( $pouch_id, '_total_items', $total_items );
+		update_post_meta( $pouch_id, '_total_weight', $total_weight );
+		update_post_meta( $pouch_id, '_total_value', $total_value );
+		update_post_meta( $pouch_id, '_optimization_result', $optimization_result );
+		update_post_meta( $pouch_id, '_calculated_shipping_cost', $calculated_cost );
+		
+		// Update package type to optimized if successful
+		if ( $optimization_result && ! isset( $optimization_result['error'] ) ) {
+			update_post_meta( $pouch_id, '_package_type', 'optimized' );
+		}
+		
+		header( 'Content-Type: application/json' );
+		wp_die( json_encode( array( 
+			'success' => true, 
+			'data' => array(
+				'total_items' => $total_items,
+				'total_weight' => $total_weight,
+				'total_value' => $total_value,
+				'calculated_cost' => $calculated_cost,
+				'has_optimization' => ! empty( $optimization_result ) && ! isset( $optimization_result['error'] )
+			)
+		) ) );
+	} // End handle_recalculate_optimization ()
 
 }
